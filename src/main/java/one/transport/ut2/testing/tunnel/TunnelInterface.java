@@ -4,6 +4,7 @@ import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Bucket4j;
 import one.transport.ut2.testing.entity.Configuration;
+import one.transport.ut2.testing.tunnel.impl.CongestionControlWindowImpl;
 import one.transport.ut2.testing.tunnel.jni.Tunnel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -21,7 +22,6 @@ public class TunnelInterface {
     public final Statistic statistic = new Statistic();
     @NotNull
     private final CopyOnWriteArrayList<Configuration.Device> bannedDevices = new CopyOnWriteArrayList<>();
-    private final Deque<PacketWithTimestamp> delayedPackets = new ConcurrentLinkedDeque<>();
     @NotNull
     private final Tunnel tunnel;
     @NotNull
@@ -33,6 +33,7 @@ public class TunnelInterface {
     public int bandwidth;
     public double speedRate;
     public PacketLoss.LossParams lossParams;
+    private CongestionControlWindow congestionControlWindow = new CongestionControlWindowImpl();
     /* threads */
     @Nullable
     private ReceivingThread receivingThread = null;
@@ -44,11 +45,17 @@ public class TunnelInterface {
         this.devices = devices;
     }
 
+    public void setCongestionControlWindowCapacity(int capacity) {
+        congestionControlWindow.setCapacity(capacity);
+    }
+
     private double calcDelay() {
         return (double) rtt / 2;
     }
 
     public Statistic flushStat() {
+        statistic.congestionControlDrop = congestionControlWindow.statistic.flushDroppedPackets();
+        statistic.totalPackets = congestionControlWindow.statistic.flushTotalPackets();
         Statistic copy = new Statistic(this.statistic);
         statistic.clear();
         return copy;
@@ -202,8 +209,8 @@ public class TunnelInterface {
 
     }
 
-    private static class PacketWithTimestamp {
-        final Packet packet;
+    public static class PacketWithTimestamp {
+        public final Packet packet;
         final long timestamp;
 
         private PacketWithTimestamp(Packet packet, long timestamp) {
@@ -216,6 +223,8 @@ public class TunnelInterface {
 
         public Clients clients;
         public Servers servers;
+        int congestionControlDrop;
+        int totalPackets;
 
         Statistic() {
         }
@@ -223,23 +232,29 @@ public class TunnelInterface {
         Statistic(Statistic stats) {
             this.clients = new Clients(stats.clients);
             this.servers = new Servers(stats.servers);
+            this.congestionControlDrop = stats.congestionControlDrop;
+            this.totalPackets = stats.totalPackets;
         }
 
         void init() {
             this.clients = new Clients();
             this.servers = new Servers();
+            this.congestionControlDrop = 0;
+            this.totalPackets = 0;
         }
 
         void clear() {
             this.clients.clear();
             this.servers.clear();
+            this.congestionControlDrop = 0;
+            this.totalPackets = 0;
         }
 
         public static class Clients {
+            final Map<Integer, HashMap<String, Integer>> ut2PacketsStat;
             long recvFromClients;
             long processedFromClients;
             long sentToServers;
-            final Map<Integer, HashMap<String, Integer>> ut2PacketsStat;
 
             Clients() {
                 this.ut2PacketsStat = new HashMap<>();
@@ -308,7 +323,7 @@ public class TunnelInterface {
 
                 if (bytes != null) {
                     Packet packet = new Packet(bytes);
-                    delayedPackets.add(new PacketWithTimestamp(packet, System.currentTimeMillis()));
+                    congestionControlWindow.tryToPush(new PacketWithTimestamp(packet, System.currentTimeMillis()));
                 }
             }
         }
@@ -322,12 +337,12 @@ public class TunnelInterface {
         @Override
         public void run() {
             while (!isInterrupted()) {
-                for (PacketWithTimestamp packetWithTimestamp = delayedPackets.peek();
+                for (PacketWithTimestamp packetWithTimestamp = congestionControlWindow.peek();
                      packetWithTimestamp != null && System.currentTimeMillis() - packetWithTimestamp.timestamp
                              > calcDelay();
-                     packetWithTimestamp = delayedPackets.peek()) {
+                     packetWithTimestamp = congestionControlWindow.peek()) {
                     processPacket(packetWithTimestamp);
-                    delayedPackets.pop();
+                    congestionControlWindow.pop();
                 }
 
                 for (Map.Entry<Configuration.Device, DevicePacketsCache> entry : recvFromClientsCaches.entrySet()) {

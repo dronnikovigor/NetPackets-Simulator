@@ -108,28 +108,31 @@ class TestStand {
             for (PacketLoss.LossParams lossParams : configuration.lossParams) {
                 for (int bandwidth : configuration.bandwidths) {
                     for (double speedRate : configuration.speedRates) {
-                        for (int fileSize : configuration.fileSizes) {
-                            tunnelInterface.rtt = rtt;
-                            tunnelInterface.lossParams = lossParams;
-                            tunnelInterface.bandwidth = bandwidth;
-                            tunnelInterface.speedRate = speedRate;
-                            tunnelInterface.start();
+                        for (int congestionControlWindow : configuration.congestionControlWindows) {
+                            for (int fileSize : configuration.fileSizes) {
+                                tunnelInterface.rtt = rtt;
+                                tunnelInterface.lossParams = lossParams;
+                                tunnelInterface.bandwidth = bandwidth;
+                                tunnelInterface.speedRate = speedRate;
+                                tunnelInterface.setCongestionControlWindowCapacity(congestionControlWindow);
+                                tunnelInterface.start();
 
-                            try {
-                                LOGGER.info("Test case started: [FileSize = " +
-                                        fileSize + "kb; Config = " + tunnelInterface + "]");
-                                test.init(configuration, tunnelInterface);
-                                testResult = test.runTest(fileSize);
-                            } catch (Exception e) {
-                                testResult = new TestContext.TestResult(Arrays.toString(e.getStackTrace()), 0,
-                                        bandwidth, fileSize, configuration.reqAmount, lossParams, null);
-                            } finally {
-                                allTestsResults.computeIfAbsent(test.getClass().getSimpleName(), k ->
-                                        new ArrayList<>()).add(testResult);
-                                LOGGER.info("Test case finished with time " + testResult.resultTime + "ms");
-                                test.clear();
+                                try {
+                                    LOGGER.info("Test case started: [FileSize = " +
+                                            fileSize + "kb; Config = " + tunnelInterface + "]");
+                                    test.init(configuration, tunnelInterface);
+                                    testResult = test.runTest(fileSize);
+                                } catch (Exception e) {
+                                    testResult = new TestContext.TestResult(Arrays.toString(e.getStackTrace()), 0,
+                                            bandwidth, fileSize, configuration.reqAmount, lossParams, null);
+                                } finally {
+                                    allTestsResults.computeIfAbsent(test.getClass().getSimpleName(), k ->
+                                            new ArrayList<>()).add(testResult);
+                                    LOGGER.info("Test case finished with time " + testResult.resultTime + "ms");
+                                    test.clear();
+                                }
+                                tunnelInterface.stop();
                             }
-                            tunnelInterface.stop();
                         }
                     }
                 }

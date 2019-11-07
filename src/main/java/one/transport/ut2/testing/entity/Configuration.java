@@ -43,8 +43,11 @@ public class Configuration {
     @SerializedName(value = "speed_rate")
     @NotNull
     public final double[] speedRates;
+    @SerializedName(value = "congestion_window")
+    @NotNull
+    public final int[] congestionControlWindows;
 
-    private Configuration(@NotNull String tunnelDevice, @NotNull Device[] devices, @NotNull int[] fileSizes, @NotNull int[] rtts, int reqAmount, @NotNull PacketLoss.LossParams[] lossParams, boolean dumping, @NotNull int[] bandwidths, @NotNull double[] speedRates) {
+    private Configuration(@NotNull String tunnelDevice, @NotNull Device[] devices, @NotNull int[] fileSizes, @NotNull int[] rtts, int reqAmount, @NotNull PacketLoss.LossParams[] lossParams, boolean dumping, @NotNull int[] bandwidths, @NotNull double[] speedRates, @NotNull int[] congestionControlWindows) {
         this.tunnelDevice = tunnelDevice;
         this.devices = devices;
         this.fileSizes = fileSizes;
@@ -54,6 +57,7 @@ public class Configuration {
         this.dumping = dumping;
         this.bandwidths = bandwidths;
         this.speedRates = speedRates;
+        this.congestionControlWindows = congestionControlWindows;
     }
 
     @Nullable
