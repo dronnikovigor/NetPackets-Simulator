@@ -1,3 +1,16 @@
+This is network packet simulator for emulating various network types in order to test the behavior of the UT2, TCP, QUIC protocols.
+
+### Functionality
+This network packet simulator support such features as:
+* Bandwidth delay
+* Speed limiting
+* Separate limits for upload/download channels 
+* Setting amount of file sizes
+* Setting amount of requests
+* Ability to test different combinations of loss 
+* Congestion control window
+* Dumping and collecting sent statistic 
+
 ### How to start 
 #### Requirements
 ##### Strong
@@ -38,17 +51,6 @@
     ```
     ./set_down.sh
     ```
-   
-### Functionality
-This packet simulator support such features as:
-* Bandwidth delay
-* Speed limiting
-* Separate limits for upload/download channels 
-* Setting amount of file sizes
-* Setting amount of requests
-* Ability to test different combinations of loss 
-* Congestion control window
-* Dumping and collecting sent statistic 
 
 ### Configuration
 There are two files for configuring tests:
