@@ -22,7 +22,7 @@ public class UT2DataTransferTestStand extends AbstractFileSendingTestStand {
             return result;
 
         initLogDir(applicationProps.getProperty("log.dir"),
-                fileSize + "KB_" + bandwidth + "ms__PL_" + lossParams.getName());
+                fileSize + "KB_" + rtt + "ms__PL_" + lossParams.getName());
 
         Configuration.Device clientDevice = testContext.configuration.getClient();
         Configuration.Device serverDevice = testContext.configuration.getServer(serverId);
@@ -37,7 +37,7 @@ public class UT2DataTransferTestStand extends AbstractFileSendingTestStand {
             }
         }
         if (ut2ServerSide == null) {
-            return new TestResult("UT2Server in null", 0, bandwidth, fileSize, reqAmount,
+            return new TestResult("UT2Server in null", 0, rtt, fileSize, reqAmount,
                     lossParams, null);
         }
 
@@ -57,7 +57,7 @@ public class UT2DataTransferTestStand extends AbstractFileSendingTestStand {
                 syncObj.wait(60_000);
                 finishTime = System.currentTimeMillis();
                 if (i++ != requestsHandler.lastRequestId) {
-                    return new TestResult("Client terminated", 0, bandwidth, fileSize, reqAmount,
+                    return new TestResult("Client terminated", 0, rtt, fileSize, reqAmount,
                             lossParams, null);
                 }
             }
@@ -69,7 +69,7 @@ public class UT2DataTransferTestStand extends AbstractFileSendingTestStand {
 
         sendCommand(ClientInterface.exit());
         if (!waitForClientProcess(60_000))
-            return new TestResult("Client terminated", finishTime - startTime, bandwidth, fileSize,
+            return new TestResult("Client terminated", finishTime - startTime, rtt, fileSize,
                     reqAmount, lossParams, null);
 
         testResult.packetLoss.fromClients = testContext.tunnelInterface.statistic.clients.getPacketLoss();

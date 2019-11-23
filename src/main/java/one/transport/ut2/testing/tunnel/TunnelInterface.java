@@ -29,8 +29,8 @@ public class TunnelInterface {
     /* caches */
     private final Map<Configuration.Device, DevicePacketsCache> recvFromClientsCaches = new HashMap<>();
     private final Map<Configuration.Device, DevicePacketsCache> recvFromServersCaches = new HashMap<>();
+    public int rtt;
     public int bandwidth;
-    public int speed;
     public double speedRate;
     public PacketLoss.LossParams lossParams;
     /* threads */
@@ -45,7 +45,7 @@ public class TunnelInterface {
     }
 
     private double calcDelay() {
-        return (double) bandwidth / 2;
+        return (double) rtt / 2;
     }
 
     public Statistic flushStat() {
@@ -58,8 +58,8 @@ public class TunnelInterface {
         for (Configuration.Device device : devices) {
             //creating buckets only for clients
             if (device.type == Configuration.Device.Type.CLIENT) {
-                recvFromClientsCaches.put(device, new DevicePacketsCache((int) (speed * (1 - speedRate))));
-                recvFromServersCaches.put(device, new DevicePacketsCache((int) (speed * speedRate)));
+                recvFromClientsCaches.put(device, new DevicePacketsCache((int) (bandwidth * (1 - speedRate))));
+                recvFromServersCaches.put(device, new DevicePacketsCache((int) (bandwidth * speedRate)));
             }
         }
     }
@@ -178,6 +178,16 @@ public class TunnelInterface {
             //todo log
             e.printStackTrace();
         }
+    }
+
+    @Override
+    public String toString() {
+        return "TunnelInterface{" +
+                "rtt=" + rtt +
+                ", bandwidth=" + bandwidth +
+                ", speedRate=" + speedRate +
+                ", lossParams=" + lossParams +
+                '}';
     }
 
     private static class DevicePacketsCache {

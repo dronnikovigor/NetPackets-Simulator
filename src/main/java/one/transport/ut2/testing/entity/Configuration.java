@@ -22,36 +22,37 @@ public class Configuration {
     @SerializedName(value = "tunnel_device")
     @NotNull
     public final String tunnelDevice;
+    @SerializedName(value = "device")
     @NotNull
     public final Device[] devices;
-    @SerializedName(value = "file_sizes")
+    @SerializedName(value = "file_size")
     @NotNull
     public final int[] fileSizes;
-    @SerializedName(value = "bandwidths")
+    @SerializedName(value = "rtt")
     @NotNull
-    public final int[] bandwidths;
+    public final int[] rtts;
     @SerializedName(value = "req_amount")
     public final int reqAmount;
-    @SerializedName(value = "lossProfiles")
+    @SerializedName(value = "lossProfile")
     @NotNull
     public final PacketLoss.LossParams[] lossParams;
     public final boolean dumping;
-    @SerializedName(value = "speeds")
+    @SerializedName(value = "bandwidth")
     @NotNull
-    public final int[] speeds;
-    @SerializedName(value = "speed_rates")
+    public final int[] bandwidths;
+    @SerializedName(value = "speed_rate")
     @NotNull
     public final double[] speedRates;
 
-    private Configuration(@NotNull String tunnelDevice, @NotNull Device[] devices, @NotNull int[] fileSizes, @NotNull int[] bandwidths, int reqAmount, @NotNull PacketLoss.LossParams[] lossParams, boolean dumping, @NotNull int[] speeds, @NotNull double[] speedRates) {
+    private Configuration(@NotNull String tunnelDevice, @NotNull Device[] devices, @NotNull int[] fileSizes, @NotNull int[] rtts, int reqAmount, @NotNull PacketLoss.LossParams[] lossParams, boolean dumping, @NotNull int[] bandwidths, @NotNull double[] speedRates) {
         this.tunnelDevice = tunnelDevice;
         this.devices = devices;
         this.fileSizes = fileSizes;
-        this.bandwidths = bandwidths;
+        this.rtts = rtts;
         this.reqAmount = reqAmount;
         this.lossParams = lossParams;
         this.dumping = dumping;
-        this.speeds = speeds;
+        this.bandwidths = bandwidths;
         this.speedRates = speedRates;
     }
 

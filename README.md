@@ -2,8 +2,8 @@ This is network packet simulator for emulating various network types in order to
 
 ### Functionality
 This network packet simulator support such features as:
-* Bandwidth delay
-* Speed limiting
+* RTT
+* Bandwidth limiting
 * Separate limits for upload/download channels 
 * Setting amount of file sizes
 * Setting amount of requests

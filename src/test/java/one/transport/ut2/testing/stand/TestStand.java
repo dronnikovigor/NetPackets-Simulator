@@ -104,20 +104,20 @@ class TestStand {
     private void executeTest(AbstractTestStand test) {
         LOGGER.info(test.getClass().getSimpleName() + " started");
         TestContext.TestResult testResult = null;
-        for (int bandwidth : configuration.bandwidths) {
+        for (int rtt : configuration.rtts) {
             for (PacketLoss.LossParams lossParams : configuration.lossParams) {
-                for (int speed : configuration.speeds) {
+                for (int bandwidth : configuration.bandwidths) {
                     for (double speedRate : configuration.speedRates) {
                         for (int fileSize : configuration.fileSizes) {
-                            tunnelInterface.bandwidth = bandwidth;
+                            tunnelInterface.rtt = rtt;
                             tunnelInterface.lossParams = lossParams;
-                            tunnelInterface.speed = speed;
+                            tunnelInterface.bandwidth = bandwidth;
                             tunnelInterface.speedRate = speedRate;
                             tunnelInterface.start();
 
                             try {
-                                LOGGER.info("Test case started: [Bandwidth = " + bandwidth + "ms; FileSize = " +
-                                        fileSize + "kb; PL = " + lossParams.getName() + "]");
+                                LOGGER.info("Test case started: [FileSize = " +
+                                        fileSize + "kb; Config = " + tunnelInterface + "]");
                                 test.init(configuration, tunnelInterface);
                                 testResult = test.runTest(fileSize);
 

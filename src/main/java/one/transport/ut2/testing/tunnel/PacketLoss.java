@@ -32,5 +32,13 @@ public class PacketLoss {
             return ("x_" + x0 + "_up_" + up + "_down_" + down).replaceAll("-", "_");
         }
 
+        @Override
+        public String toString() {
+            return "LossParams{" +
+                    "x0=" + x0 +
+                    ", up=" + up +
+                    ", down=" + down +
+                    '}';
+        }
     }
 }

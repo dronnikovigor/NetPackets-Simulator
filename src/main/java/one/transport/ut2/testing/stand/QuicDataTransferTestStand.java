@@ -79,7 +79,7 @@ public class QuicDataTransferTestStand extends AbstractTestStand {
             /* waiting server to start */
             Thread.sleep(2000);
         } catch (IOException | InterruptedException e) {
-            return new TestResult("Error while binding server: " + e, 0, bandwidth, fileSize, reqAmount,
+            return new TestResult("Error while binding server: " + e, 0, rtt, fileSize, reqAmount,
                     lossParams, null);
         }
 
@@ -124,7 +124,7 @@ public class QuicDataTransferTestStand extends AbstractTestStand {
             Files.createFile(clientErrFile);
             Files.createFile(clientOutFile);
         } catch (IOException e) {
-            return new TestResult("Error while opening output files: " + e, 0, bandwidth, fileSize,
+            return new TestResult("Error while opening output files: " + e, 0, rtt, fileSize,
                     reqAmount, lossParams, null);
         }
 
@@ -135,7 +135,7 @@ public class QuicDataTransferTestStand extends AbstractTestStand {
             clientProcessBuilder.redirectOutput(clientOutFile.toFile());
             clientProcess = clientProcessBuilder.start();
         } catch (IOException e) {
-            return new TestResult("Error while starting client: " + e, 0, bandwidth, fileSize,
+            return new TestResult("Error while starting client: " + e, 0, rtt, fileSize,
                     reqAmount, lossParams, null);
         }
 
@@ -160,7 +160,7 @@ public class QuicDataTransferTestStand extends AbstractTestStand {
                     if (counter == reqAmount)
                         requestTestResult.success = true;
                 } catch (IOException e) {
-                    return new TestResult("Error while checking response: " + e, 0, bandwidth, fileSize,
+                    return new TestResult("Error while checking response: " + e, 0, rtt, fileSize,
                             reqAmount, lossParams, null);
                 }
 
@@ -185,13 +185,13 @@ public class QuicDataTransferTestStand extends AbstractTestStand {
                     }
                 } catch (IOException e) {
                     return new TestResult("Error while checking time in logs: " + e,
-                            finishTime - startTime, bandwidth, fileSize, reqAmount, lossParams, null);
+                            finishTime - startTime, rtt, fileSize, reqAmount, lossParams, null);
                 }
-            } else return new TestResult("Client terminated!", 0, bandwidth, fileSize, reqAmount,
+            } else return new TestResult("Client terminated!", 0, rtt, fileSize, reqAmount,
                     lossParams, null);
         } catch (InterruptedException e) {
             clientProcess.destroy();
-            return new TestResult("Error while running client: " + e, 0, bandwidth, fileSize, reqAmount,
+            return new TestResult("Error while running client: " + e, 0, rtt, fileSize, reqAmount,
                     lossParams, null);
         }
 

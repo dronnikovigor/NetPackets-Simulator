@@ -45,7 +45,7 @@ public class PureTcpDataTransferTestStand extends AbstractTestStand {
             testContext.configuration.getServer(serverId).udpPort = serverThread.getPort();
             serverThread.start();
         } catch (IOException e) {
-            return new TestResult("Error while binding server: " + e, 0, bandwidth, fileSize, reqAmount,
+            return new TestResult("Error while binding server: " + e, 0, rtt, fileSize, reqAmount,
                     lossParams, null);
         }
 
@@ -58,7 +58,7 @@ public class PureTcpDataTransferTestStand extends AbstractTestStand {
             client.bind(clientAddr);
             testContext.configuration.getClient().udpPort = client.getLocalPort();
         } catch (IOException e) {
-            return new TestResult("Error while binding client: " + e, 0, bandwidth, fileSize, reqAmount,
+            return new TestResult("Error while binding client: " + e, 0, rtt, fileSize, reqAmount,
                     lossParams, null);
         }
 
@@ -69,7 +69,7 @@ public class PureTcpDataTransferTestStand extends AbstractTestStand {
                     new InetSocketAddress(InetAddress.getByAddress(serverAddr2Bytes), serverThread.getPort());
             client.connect(serverAddr2);
         } catch (IOException e) {
-            return new TestResult("Error while connecting client: " + e, 0, bandwidth, fileSize,
+            return new TestResult("Error while connecting client: " + e, 0, rtt, fileSize,
                     reqAmount, lossParams, null);
         }
 
@@ -83,7 +83,7 @@ public class PureTcpDataTransferTestStand extends AbstractTestStand {
                     new BufferedInputStream(is)
             );
         } catch (IOException e) {
-            return new TestResult("IOException while opening client output streams: " + e, 0, bandwidth,
+            return new TestResult("IOException while opening client output streams: " + e, 0, rtt,
                     fileSize, reqAmount, lossParams, null);
         }
 
@@ -105,7 +105,7 @@ public class PureTcpDataTransferTestStand extends AbstractTestStand {
                 success &= Arrays.equals(response, fileData);
                 LOGGER.info("Progress: " + (i + 1) * 100 / reqAmount + "%");
             } catch (IOException e) {
-                return new TestResult("IOException while RW to stream: " + e, 0, bandwidth, fileSize,
+                return new TestResult("IOException while RW to stream: " + e, 0, rtt, fileSize,
                         reqAmount, lossParams, null);
             }
         }

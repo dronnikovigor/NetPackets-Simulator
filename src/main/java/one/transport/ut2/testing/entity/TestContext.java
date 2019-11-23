@@ -32,10 +32,10 @@ public class TestContext {
         public long resultTime;
         public String error;
 
-        public int bandwidth;
+        public int rtt;
         public int fileSize;
         public int requests;
-        public int speed;
+        public int bandwidth;
         public double speedRate;
 
         public one.transport.ut2.testing.tunnel.PacketLoss.LossParams lossParams;
@@ -49,10 +49,10 @@ public class TestContext {
             this.error = error;
         }
 
-        public TestResult(String error, long resultTime, int bandwidth, int fileSize, int requests, PacketLoss.LossParams lossParams, PacketLossResults packetLoss) {
+        public TestResult(String error, long resultTime, int rtt, int fileSize, int requests, PacketLoss.LossParams lossParams, PacketLossResults packetLoss) {
             this.error = error;
             this.resultTime = resultTime;
-            this.bandwidth = bandwidth;
+            this.rtt = rtt;
             this.fileSize = fileSize;
             this.requests = requests;
             this.lossParams = lossParams;
@@ -70,10 +70,10 @@ public class TestContext {
                     "success=" + success +
                     ", error='" + error + '\'' +
                     ", resultTime=" + resultTime +
-                    ", bandwidth=" + bandwidth +
+                    ", bandwidth=" + rtt +
                     ", fileSize=" + fileSize +
                     ", requests=" + requests +
-                    ", speed=" + speed +
+                    ", bandwidth=" + bandwidth +
                     ", speedRate=" + speedRate +
                     ", lossParams=" + lossParams +
                     ", packetLoss=" + packetLoss +
