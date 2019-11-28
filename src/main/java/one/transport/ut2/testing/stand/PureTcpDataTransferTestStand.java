@@ -13,10 +13,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
 
-public class PureTcpDataTransferTestStand extends AbstractTestStand {
+public class PureTcpDataTransferTestStand extends AbstractCommonFileSendingTestStand {
     private final static Logger LOGGER = LoggerFactory.getLogger(PureTcpDataTransferTestStand.class);
     private final Random rnd = new Random();
-    private volatile byte[] fileData;
+    private byte[] fileData;
     private ServerThread serverThread;
 
     @Override
@@ -36,139 +36,164 @@ public class PureTcpDataTransferTestStand extends AbstractTestStand {
         if (result.error != null)
             return result;
 
-        boolean success = true;
+        fileData = new byte[fileSize * 1024];
+        rnd.nextBytes(fileData);
 
         /* server init */
         Configuration.Device serverDevice = testContext.configuration.getServer(serverId);
         try {
             serverThread = new ServerThread(serverDevice);
-            testContext.configuration.getServer(serverId).udpPort = serverThread.getPort();
+            serverDevice.tcpPort = serverThread.getPort();
             serverThread.start();
         } catch (IOException e) {
             return new TestResult("Error while binding server: " + e, 0, rtt, fileSize, reqAmount,
                     lossParams, null);
         }
 
-        /* client info */
-        Configuration.Device clientDevice = testContext.configuration.getClient();
-        Socket client = new Socket();
-        try {
-            SocketAddress clientAddr =
-                    new InetSocketAddress(InetAddress.getByAddress(clientDevice.getIpBytes()), clientDevice.tcpPort);
-            client.bind(clientAddr);
-            testContext.configuration.getClient().udpPort = client.getLocalPort();
-        } catch (IOException e) {
-            return new TestResult("Error while binding client: " + e, 0, rtt, fileSize, reqAmount,
-                    lossParams, null);
+        /* clients init */
+        final Configuration.Device[] configurationClients = testContext.configuration.getClients();
+        for (Configuration.Device configurationClient : configurationClients) {
+            final ClientThread clientThread = new ClientThread(configurationClient, serverDevice);
+            /* checking for init errors */
+            if (clientThread.testResult == null)
+                clientThreads.add(clientThread);
+            else
+                return clientThread.testResult;
         }
 
-        try {
-            byte[] serverAddr2Bytes = clientDevice.getNetAddr();
-            serverAddr2Bytes[3] = serverDevice.getHostAddr();
-            SocketAddress serverAddr2 =
-                    new InetSocketAddress(InetAddress.getByAddress(serverAddr2Bytes), serverThread.getPort());
-            client.connect(serverAddr2);
-        } catch (IOException e) {
-            return new TestResult("Error while connecting client: " + e, 0, rtt, fileSize,
-                    reqAmount, lossParams, null);
-        }
-
-        InputStream is;
-        OutputStream os;
-        DataInputStream dis;
-        try {
-            is = client.getInputStream();
-            os = client.getOutputStream();
-            dis = new DataInputStream(
-                    new BufferedInputStream(is)
-            );
-        } catch (IOException e) {
-            return new TestResult("IOException while opening client output streams: " + e, 0, rtt,
-                    fileSize, reqAmount, lossParams, null);
-        }
-
-        final long startTime = System.currentTimeMillis();
-
-        fileData = new byte[fileSize * 1024];
-        rnd.nextBytes(fileData);
-
-        for (int i = 0; i < reqAmount; ++i) {
-            ByteArrayOutputStream req2 = new ByteArrayOutputStream();
-            req2.write(fileData, 0, 1024);
-
-            try {
-                req2.writeTo(os);
-                os.flush();
-                byte[] response = new byte[fileSize * 1024];
-                dis.readFully(response);
-
-                success &= Arrays.equals(response, fileData);
-                LOGGER.info("Progress: " + (i + 1) * 100 / reqAmount + "%");
-            } catch (IOException e) {
-                return new TestResult("IOException while RW to stream: " + e, 0, rtt, fileSize,
-                        reqAmount, lossParams, null);
-            }
-        }
-
-        testResult.resultTime = System.currentTimeMillis() - startTime;
-        testResult.success = success;
-
-        testResult.packetLoss.fromClients = testContext.tunnelInterface.statistic.clients.getPacketLoss();
-        testResult.packetLoss.fromServers = testContext.tunnelInterface.statistic.servers.getPacketLoss();
-
-        client.close();
-
-        return testResult;
+        return runTest();
     }
 
     @Override
     public void clear() {
+        super.clear();
+
         if (serverThread != null) {
             serverThread.interrupt();
         }
+    }
 
-        super.clear();
+    private class ClientThread extends AbstractClientThread {
+        final private Socket socket;
+
+        private InputStream is;
+        private OutputStream os;
+        private DataInputStream dis;
+
+        private TestResult testResult;
+
+        ClientThread(Configuration.Device clientConf, Configuration.Device serverConf) {
+            socket = new Socket();
+            try {
+                SocketAddress clientAddr =
+                        new InetSocketAddress(InetAddress.getByAddress(clientConf.getIpBytes()), 0);
+                socket.bind(clientAddr);
+                clientConf.tcpPort = socket.getLocalPort();
+            } catch (IOException e) {
+                testResult = new TestResult("Error while binding client: " + e, 0, rtt, fileSize, reqAmount,
+                        lossParams, null);
+            }
+            try {
+                byte[] serverAddr2Bytes = clientConf.getNetAddr();
+                serverAddr2Bytes[3] = serverConf.getHostAddr();
+                SocketAddress serverAddr =
+                        new InetSocketAddress(InetAddress.getByAddress(serverAddr2Bytes), serverThread.getPort());
+                socket.connect(serverAddr);
+            } catch (IOException e) {
+                testResult = new TestResult("Error while connecting client: " + e, 0, rtt, fileSize,
+                        reqAmount, lossParams, null);
+            }
+            try {
+                is = socket.getInputStream();
+                os = socket.getOutputStream();
+                dis = new DataInputStream(
+                        new BufferedInputStream(is)
+                );
+            } catch (IOException e) {
+                testResult = new TestResult("IOException while opening client output streams: " + e, 0, rtt,
+                        fileSize, reqAmount, lossParams, null);
+            }
+        }
+
+        @Override
+        public void run() {
+            for (int i = 0; i < reqAmount; ++i) {
+                ByteArrayOutputStream req2 = new ByteArrayOutputStream();
+                req2.write(fileData, 0, 1024);
+
+                try {
+                    req2.writeTo(os);
+                    os.flush();
+                    byte[] response = new byte[fileSize * 1024];
+                    dis.readFully(response);
+
+                    final boolean success = Arrays.equals(response, fileData);
+                    if (!success)
+                        testResult = new TestResult("Data was corrupted!", 0, rtt,
+                                fileSize, reqAmount, lossParams, null);
+                    LOGGER.info("Progress: " + (i + 1) * 100 / reqAmount + "%");
+                } catch (IOException e) {
+                    testResult = new TestResult("IOException while RW to stream: " + e, 0, rtt,
+                            fileSize, reqAmount, lossParams, null);
+                }
+            }
+        }
+
+        @Override
+        void clear() {
+        }
     }
 
     private class ServerThread extends Thread {
-        final ServerSocket serverSocket;
+        final private ServerSocket serverSocket;
 
         private ServerThread(Configuration.Device serverDevice) throws IOException {
             serverSocket = new ServerSocket();
             SocketAddress serverAddr =
-                    new InetSocketAddress(InetAddress.getByAddress(serverDevice.getIpBytes()), serverDevice.tcpPort);
+                    new InetSocketAddress(InetAddress.getByAddress(serverDevice.getIpBytes()), 0);
             serverSocket.bind(serverAddr);
         }
 
         @Override
         public void run() {
-            final byte[] buffer = new byte[1024];
-            try {
-                Socket socket = serverSocket.accept();
-                InputStream is = socket.getInputStream();
-                OutputStream os = socket.getOutputStream();
-
-                DataInputStream dis = new DataInputStream(
-                        new BufferedInputStream(is)
-                );
-                DataOutputStream dos = new DataOutputStream(
-                        new BufferedOutputStream(os)
-                );
-
-                while (!isInterrupted()) {
-                    dis.readFully(buffer);
-
-                    dos.write(fileData);
-                    dos.flush();
-                }
-            } catch (Exception e) {
-                //ignore
-            } finally {
+            while (!isInterrupted()) {
                 try {
-                    serverSocket.close();
+                    Socket socket = serverSocket.accept();
+                    new Thread(() -> {
+                        LOGGER.info("New connection opened: " + socket.getRemoteSocketAddress());
+                        final byte[] buffer = new byte[1024];
+                        try {
+                            InputStream is = socket.getInputStream();
+                            OutputStream os = socket.getOutputStream();
+                            DataInputStream dis = new DataInputStream(
+                                    new BufferedInputStream(is)
+                            );
+                            DataOutputStream dos = new DataOutputStream(
+                                    new BufferedOutputStream(os)
+                            );
+
+                            while (!ServerThread.this.isInterrupted() && socket.isConnected()) {
+                                try {
+                                    dis.readFully(buffer);
+
+                                    dos.write(fileData);
+                                    dos.flush();
+                                } catch (EOFException e) {
+                                    //TODO fix exception
+                                }
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }).start();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+            }
+            try {
+                serverSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
 

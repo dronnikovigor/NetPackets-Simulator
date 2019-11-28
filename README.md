@@ -9,6 +9,7 @@ This network packet simulator support such features as:
 * Setting amount of requests
 * Ability to test different combinations of loss 
 * Congestion control window
+* Multi-client routing support
 * Dumping and collecting sent statistic 
 
 ### How to start 

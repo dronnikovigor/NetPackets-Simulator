@@ -120,13 +120,6 @@ class TestStand {
                                         fileSize + "kb; Config = " + tunnelInterface + "]");
                                 test.init(configuration, tunnelInterface);
                                 testResult = test.runTest(fileSize);
-
-                                /* waiting while all packets from client/server reach dst */
-                                try {
-                                    Thread.sleep(2000);
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
-                                }
                             } catch (Exception e) {
                                 testResult = new TestContext.TestResult(Arrays.toString(e.getStackTrace()), 0,
                                         bandwidth, fileSize, configuration.reqAmount, lossParams, null);

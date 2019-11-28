@@ -89,6 +89,12 @@ public class Configuration {
                 .toArray(Device[]::new);
     }
 
+    public Device[] getClients() {
+        return Arrays.stream(devices)
+                .filter(d -> d.type == Device.Type.CLIENT)
+                .toArray(Device[]::new);
+    }
+
     public Device getServer(byte id) {
         for (Device device : devices) {
             if (device.type == Device.Type.SERVER && device.hostAddr == id) {
@@ -98,9 +104,9 @@ public class Configuration {
         return null;
     }
 
-    public Device getClient() {
+    public Device getClient(byte id) {
         for (Device device : devices) {
-            if (device.type == Device.Type.CLIENT) {
+            if (device.type == Device.Type.CLIENT && device.hostAddr == id) {
                 return device;
             }
         }
