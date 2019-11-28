@@ -30,7 +30,7 @@
       "tcp_port": 0
     }
   ],
-  "lossProfiles" : [
+  "lossProfile" : [
     {
       "x0" : 0,
       "up" : 50,
