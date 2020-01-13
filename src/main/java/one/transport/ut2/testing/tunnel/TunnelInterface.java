@@ -115,12 +115,12 @@ public class TunnelInterface {
             /* adding to sending deque of client device */
             statistic.clients.recvFromClients++;
             DevicePacketsCache cache = recvFromClientsCaches.get(srcDevice);
-            cache.pendingPackets.add(packet);
+            cache.pendingPackets.add(packetWithTimestamp);
         } else if (dstDevice.type == Configuration.Device.Type.CLIENT) {
             /* adding to receiving deque of client device */
             statistic.servers.recvFromServers++;
             DevicePacketsCache cache = recvFromServersCaches.get(dstDevice);
-            cache.pendingPackets.add(packet);
+            cache.pendingPackets.add(packetWithTimestamp);
         } else {
             /* from server to server packets delivered without delay */
             statistic.servers.betweenServers++;
@@ -199,7 +199,7 @@ public class TunnelInterface {
 
     private static class DevicePacketsCache {
         /* receiving thread adding packets to this deque and sending thread extracting */
-        final Deque<Packet> pendingPackets = new ConcurrentLinkedDeque<>();
+        final Deque<PacketWithTimestamp> pendingPackets = new ConcurrentLinkedDeque<>();
         final Bucket bucket;
 
         DevicePacketsCache(int rate) {
@@ -347,13 +347,15 @@ public class TunnelInterface {
 
                 for (Map.Entry<Configuration.Device, DevicePacketsCache> entry : recvFromClientsCaches.entrySet()) {
                     DevicePacketsCache packetsCache = entry.getValue();
-                    Deque<Packet> pendingPackets = packetsCache.pendingPackets;
+                    Deque<PacketWithTimestamp> pendingPackets = packetsCache.pendingPackets;
                     while (pendingPackets.size() > 0) {
-                        Packet packet = pendingPackets.peek();
+                        PacketWithTimestamp packetWithTimestamp = pendingPackets.peek();
+                        final Packet packet = packetWithTimestamp.packet;
+                        final long timestamp = packetWithTimestamp.timestamp;
                         //ip header starts from 4th byte
                         if (packetsCache.bucket.tryConsume(packet.getLength() - 4)) {
                             statistic.clients.processedFromClients++;
-                            if (sendToServersLF.loss(statistic.clients.processedFromClients))
+                            if (sendToServersLF.loss(statistic.clients.processedFromClients, timestamp))
                                 pendingPackets.pop();
                             else {
                                 pendingPackets.pop();
@@ -368,13 +370,15 @@ public class TunnelInterface {
                 for (Map.Entry<Configuration.Device, DevicePacketsCache> entry : recvFromServersCaches.entrySet()) {
                     Configuration.Device dstDevice = entry.getKey();
                     DevicePacketsCache packetsCache = entry.getValue();
-                    Deque<Packet> pendingPackets = packetsCache.pendingPackets;
+                    Deque<PacketWithTimestamp> pendingPackets = packetsCache.pendingPackets;
                     while (pendingPackets.size() > 0) {
-                        Packet packet = pendingPackets.peek();
+                        PacketWithTimestamp packetWithTimestamp = pendingPackets.peek();
+                        final Packet packet = packetWithTimestamp.packet;
+                        final long timestamp = packetWithTimestamp.timestamp;
                         //ip header starts from 4th byte
                         if (packetsCache.bucket.tryConsume(packet.getLength() - 4)) {
                             statistic.servers.processedFromServers++;
-                            if (sendToClientsLF.loss(statistic.servers.processedFromServers))
+                            if (sendToClientsLF.loss(statistic.servers.processedFromServers, timestamp))
                                 pendingPackets.pop();
                             else {
                                 pendingPackets.pop();
