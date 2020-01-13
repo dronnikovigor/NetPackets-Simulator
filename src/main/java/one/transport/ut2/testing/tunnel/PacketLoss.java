@@ -74,7 +74,7 @@ public class PacketLoss {
             this.x0 = x0;
             this.up = up;
             this.down = down;
-            this.interval = interval;
+            this.interval = Math.min(interval, x0);
         }
 
         public String getName() {
