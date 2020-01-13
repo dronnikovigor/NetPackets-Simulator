@@ -2,14 +2,22 @@
   "dumping" : false,
   "tunnel_device" : "tun1",
   "req_amount" : 5,
-  "file_sizes" : [5, 10, 20, 50, 100, 200, 500, 1024],
-  "bandwidths": [2, 20, 30, 100, 200],
-  "speeds" : [1048576, 10485760],
-  "speed_rates" : [0.7],
-  "devices": [
+  "file_size" : [5, 10, 20, 50, 100, 200, 500, 1024],
+  "rtt": [2, 20, 30, 100, 200],
+  "bandwidth" : [1048576, 10485760],
+  "speed_rate" : [0.7],
+  "congestion_window" : [1048576],
+  "device": [
     {
       "type": "client",
       "host_addr": 1,
+      "net_addr": [10, 0, 0],
+      "udp_port": 1232,
+      "tcp_port": 0
+    },
+    {
+      "type": "client",
+      "host_addr": 2,
       "net_addr": [10, 0, 0],
       "udp_port": 1233,
       "tcp_port": 0
@@ -22,31 +30,49 @@
       "tcp_port": 0
     }
   ],
-  "lossProfiles" : [
+  "lossProfile" : [
     {
+      "enabled" : true,
       "x0" : 0,
       "up" : 50,
-      "down" : 0
+      "down" : 0,
+      "intervals" : false
     },
     {
+      "enabled" : true,
       "x0" : -35,
       "up" : 49,
-      "down" : 1
+      "down" : 1,
+      "intervals" : false
     },
     {
+      "enabled" : true,
       "x0" : -36,
       "up" : 48,
-      "down" : 2
+      "down" : 2,
+      "intervals" : false
     },
     {
+      "enabled" : true,
       "x0" : -36,
       "up" : 47,
-      "down" : 3
+      "down" : 3,
+      "intervals" : false
     },
     {
+      "enabled" : true,
       "x0" : -37,
       "up" : 46,
-      "down" : 4
+      "down" : 4,
+      "intervals" : false
+    },
+    {
+      "enabled" : true,
+      "x0" : -37,
+      "up" : 40,
+      "down" : 10,
+      "intervals" : true,
+      "interval" : 4
     }
   ]
 }

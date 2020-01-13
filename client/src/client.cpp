@@ -8,6 +8,7 @@
 #include <string.h>
 #include <ut2-native/pool.h>
 #include <ut2-native/server_args.h>
+#include <unistd.h>
 
 const char *TAG = " [client] ";
 auto start_time = std::chrono::high_resolution_clock::now();
@@ -42,6 +43,7 @@ int main()
 	args.tcp.enabled = conf.tcp_mode;
 	args.udp.enabled = conf.udp_mode;
 
+	log() << "PID: " << getpid() << std::endl;
 	log() << "running mode: [udp=" << args.udp.enabled << "; tcp=" << args.tcp.enabled << "]" << std::endl;
 
 	in_addr_t client_addr;

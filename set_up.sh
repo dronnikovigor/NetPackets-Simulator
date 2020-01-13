@@ -1,7 +1,7 @@
 #!/bin/bash
 
 interface_name="tun1"
-ip_addresses=("10.0.0.1/24" "10.0.1.254/24" "10.0.2.253/24")
+ip_addresses=("10.0.0.1/24" "10.0.0.2/24" "10.0.1.254/24" "10.0.2.253/24")
 mode="tun"
 
 sudo ip tuntap add name $interface_name mode $mode

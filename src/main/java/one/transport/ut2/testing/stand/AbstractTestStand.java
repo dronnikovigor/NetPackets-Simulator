@@ -28,8 +28,8 @@ public abstract class AbstractTestStand {
 
     byte serverId;
     int reqAmount;
-    int bandwidth;
-    private int speed;
+    int rtt;
+    private int bandwidth;
     PacketLoss.LossParams lossParams;
     private double speedRate;
     int fileSize;
@@ -40,21 +40,21 @@ public abstract class AbstractTestStand {
         serverId = (byte) 254;
         this.fileSize = fileSize;
         reqAmount = testContext.configuration.reqAmount;
+        rtt = testContext.tunnelInterface.rtt;
         bandwidth = testContext.tunnelInterface.bandwidth;
-        speed = testContext.tunnelInterface.speed;
         speedRate = testContext.tunnelInterface.speedRate;
         lossParams = testContext.tunnelInterface.lossParams;
 
         testResult = new TestContext.TestResult();
         testResult.fileSize = fileSize;
-        testResult.bandwidth = bandwidth;
+        testResult.rtt = rtt;
         testResult.requests = reqAmount;
         testResult.lossParams = lossParams;
-        testResult.speed = speed;
+        testResult.bandwidth = bandwidth;
         testResult.speedRate = speedRate;
 
         initLogDir(applicationProps.getProperty("log.dir"),
-                fileSize + "KB_" + bandwidth + "ms__PL_" + lossParams.getName());
+                fileSize + "KB_" + rtt + "ms__PL_" + lossParams.getName());
 
         if (testContext.configuration.dumping) {
             try {
@@ -64,7 +64,7 @@ public abstract class AbstractTestStand {
                         .start();
                 Thread.sleep(2000);
             } catch (InterruptedException e) {
-                return new TestContext.TestResult("Error while starting Tshark: " + e, 0, bandwidth, fileSize,
+                return new TestContext.TestResult("Error while starting Tshark: " + e, 0, rtt, fileSize,
                         reqAmount, lossParams, null);
             }
         }

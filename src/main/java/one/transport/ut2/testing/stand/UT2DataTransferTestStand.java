@@ -1,14 +1,16 @@
 package one.transport.ut2.testing.stand;
 
+import one.transport.ut2.testing.entity.ClientInterface;
 import one.transport.ut2.testing.entity.Configuration;
 import one.transport.ut2.testing.entity.ServerSide;
 import one.transport.ut2.testing.entity.TestContext.TestResult;
 import one.transport.ut2.testing.entity.impl.UT2ServerSide;
-import one.transport.ut2.testing.entity.ClientInterface;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 import static one.transport.ut2.testing.ApplicationProperties.applicationProps;
 
@@ -22,12 +24,14 @@ public class UT2DataTransferTestStand extends AbstractFileSendingTestStand {
             return result;
 
         initLogDir(applicationProps.getProperty("log.dir"),
-                fileSize + "KB_" + bandwidth + "ms__PL_" + lossParams.getName());
+                fileSize + "KB_" + rtt + "ms__PL_" + lossParams.getName());
 
-        Configuration.Device clientDevice = testContext.configuration.getClient();
         Configuration.Device serverDevice = testContext.configuration.getServer(serverId);
-        writeClientConfiguration(clientDevice, serverDevice);
-        initClientProcess();
+        for (Configuration.Device clientDevice : testContext.configuration.getClients()) {
+            writeClientConfiguration(clientDevice, serverDevice);
+            initClientProcess();
+            Thread.sleep(1000);
+        }
 
         UT2ServerSide ut2ServerSide = null;
         for (ServerSide server : testContext.serverSides) {
@@ -37,7 +41,7 @@ public class UT2DataTransferTestStand extends AbstractFileSendingTestStand {
             }
         }
         if (ut2ServerSide == null) {
-            return new TestResult("UT2Server in null", 0, bandwidth, fileSize, reqAmount,
+            return new TestResult("UT2Server in null", 0, rtt, fileSize, reqAmount,
                     lossParams, null);
         }
 
@@ -46,31 +50,49 @@ public class UT2DataTransferTestStand extends AbstractFileSendingTestStand {
 
         Path dataFile = generateFileBySize(logDir, fileSize);
 
-        final long startTime = System.currentTimeMillis();
-        sendCommand(ClientInterface.sendCommand(reqAmount, fileSize * 1024, dataFile));
+        List<Thread> responseThreads = new ArrayList<>();
 
-        //todo add timeout
-        long finishTime = 0;
-        int i = 0;
-        while (requestsHandler.lastRequestId != reqAmount - 1) {
-            synchronized (syncObj) {
-                syncObj.wait(60_000);
-                finishTime = System.currentTimeMillis();
-                if (i++ != requestsHandler.lastRequestId) {
-                    return new TestResult("Client terminated", 0, bandwidth, fileSize, reqAmount,
-                            lossParams, null);
+        final long startTime = System.currentTimeMillis();
+        for (int i = 0; i < testContext.configuration.getClients().length; i++) {
+            sendCommand(i, ClientInterface.sendCommand(reqAmount, fileSize * 1024, dataFile));
+
+            Thread responseThread = new Thread(() -> {
+                while (requestsHandler.lastRequestId != reqAmount - 1) {
+                    synchronized (syncObj) {
+                        try {
+                            syncObj.wait(60_000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
                 }
-            }
-            LOGGER.info("Progress: " + (requestsHandler.lastRequestId + 1) * 100 / reqAmount + "%");
+            });
+            responseThread.start();
+            responseThreads.add(responseThread);
         }
 
+        for (int i = 0; i < responseThreads.size(); i++) {
+            Thread responseThread = responseThreads.get(i);
+            try {
+                responseThread.join(60_000);
+                LOGGER.info("Progress: " + (i + 1) * 100 / responseThreads.size() + "%");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        final long finishTime = System.currentTimeMillis();
         testResult.resultTime = finishTime - startTime;
         testResult.success = true;
 
-        sendCommand(ClientInterface.exit());
-        if (!waitForClientProcess(60_000))
-            return new TestResult("Client terminated", finishTime - startTime, bandwidth, fileSize,
-                    reqAmount, lossParams, null);
+        Thread.sleep(1000);
+
+        for (int i = 0; i < testContext.configuration.getClients().length; i++) {
+            sendCommand(i, ClientInterface.exit());
+            if (!waitForClientProcess(i, 60_000))
+                return new TestResult("Client terminated", finishTime - startTime, rtt, fileSize,
+                        reqAmount, lossParams, null);
+        }
 
         testResult.packetLoss.fromClients = testContext.tunnelInterface.statistic.clients.getPacketLoss();
         testResult.packetLoss.fromServers = testContext.tunnelInterface.statistic.servers.getPacketLoss();
@@ -79,5 +101,4 @@ public class UT2DataTransferTestStand extends AbstractFileSendingTestStand {
 
         return testResult;
     }
-
 }

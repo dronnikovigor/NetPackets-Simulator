@@ -104,39 +104,35 @@ class TestStand {
     private void executeTest(AbstractTestStand test) {
         LOGGER.info(test.getClass().getSimpleName() + " started");
         TestContext.TestResult testResult = null;
-        for (int bandwidth : configuration.bandwidths) {
+        for (int rtt : configuration.rtts) {
             for (PacketLoss.LossParams lossParams : configuration.lossParams) {
-                for (int speed : configuration.speeds) {
+                for (int bandwidth : configuration.bandwidths) {
                     for (double speedRate : configuration.speedRates) {
-                        for (int fileSize : configuration.fileSizes) {
-                            tunnelInterface.bandwidth = bandwidth;
-                            tunnelInterface.lossParams = lossParams;
-                            tunnelInterface.speed = speed;
-                            tunnelInterface.speedRate = speedRate;
-                            tunnelInterface.start();
+                        for (int congestionControlWindow : configuration.congestionControlWindows) {
+                            for (int fileSize : configuration.fileSizes) {
+                                tunnelInterface.rtt = rtt;
+                                tunnelInterface.lossParams = lossParams;
+                                tunnelInterface.bandwidth = bandwidth;
+                                tunnelInterface.speedRate = speedRate;
+                                tunnelInterface.setCongestionControlWindowCapacity(congestionControlWindow);
+                                tunnelInterface.start();
 
-                            try {
-                                LOGGER.info("Test case started: [Bandwidth = " + bandwidth + "ms; FileSize = " +
-                                        fileSize + "kb; PL = " + lossParams.getName() + "]");
-                                test.init(configuration, tunnelInterface);
-                                testResult = test.runTest(fileSize);
-
-                                /* waiting while all packets from client/server reach dst */
                                 try {
-                                    Thread.sleep(2000);
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
+                                    LOGGER.info("Test case started: [FileSize = " +
+                                            fileSize + "kb; Config = " + tunnelInterface + "]");
+                                    test.init(configuration, tunnelInterface);
+                                    testResult = test.runTest(fileSize);
+                                } catch (Exception e) {
+                                    testResult = new TestContext.TestResult(Arrays.toString(e.getStackTrace()), 0,
+                                            bandwidth, fileSize, configuration.reqAmount, lossParams, null);
+                                } finally {
+                                    allTestsResults.computeIfAbsent(test.getClass().getSimpleName(), k ->
+                                            new ArrayList<>()).add(testResult);
+                                    LOGGER.info("Test case finished with time " + testResult.resultTime + "ms");
+                                    test.clear();
                                 }
-                            } catch (Exception e) {
-                                testResult = new TestContext.TestResult(Arrays.toString(e.getStackTrace()), 0,
-                                        bandwidth, fileSize, configuration.reqAmount, lossParams, null);
-                            } finally {
-                                allTestsResults.computeIfAbsent(test.getClass().getSimpleName(), k ->
-                                        new ArrayList<>()).add(testResult);
-                                LOGGER.info("Test case finished with time " + testResult.resultTime + "ms");
-                                test.clear();
+                                tunnelInterface.stop();
                             }
-                            tunnelInterface.stop();
                         }
                     }
                 }
