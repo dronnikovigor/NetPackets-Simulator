@@ -21,6 +21,7 @@ This network packet simulator support such features as:
 * `valgrid` - for checking memory leaks
 * `tshark` - for dumping packets
 * built QUIC from Chromium sources for QUIC tests (check for it: https://www.chromium.org/quic/playing-with-quic)
+* built QUICHE from sources for QUICHE tests (check for it: https://github.com/cloudflare/quiche)
 
 ### How to run
 1. Build project with dependencies:
@@ -47,6 +48,10 @@ This network packet simulator support such features as:
     * QUIC:
     ```
     ./gradlew cleanTest test --tests "one.transport.ut2.testing.stand.TestStand.QuicDataTransferTest" --info
+    ```
+   * QUIC->QUICHE:
+    ```
+    ./gradlew cleanTest test --tests "one.transport.ut2.testing.stand.TestStand.QuicQuicheDataTransferTest" --info
     ```
 4. Set down environment:
     ```

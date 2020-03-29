@@ -1,13 +1,17 @@
 package one.transport.ut2.testing.stand;
 
+import one.transport.ut2.testing.entity.Configuration;
 import one.transport.ut2.testing.entity.TestContext;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
 abstract class AbstractCommonFileSendingTestStand extends AbstractTestStand {
 
     List<AbstractClientThread> clientThreads = new ArrayList<>();
+    AbstractServerThread serverThread;
 
     protected TestContext.TestResult runTest() {
         final long startTime = System.currentTimeMillis();
@@ -44,11 +48,28 @@ abstract class AbstractCommonFileSendingTestStand extends AbstractTestStand {
         super.clear();
     }
 
+    abstract void initServer(Configuration.Device device) throws IOException;
+
     abstract class AbstractClientThread extends Thread {
+        protected int id;
+        protected ProcessBuilder processBuilder;
+        protected Process process;
+
+        protected Path clientErrFile;
+        protected Path clientOutFile;
 
         TestContext.TestResult testResult;
 
         abstract void clear();
 
+        AbstractClientThread() {
+            id = clientThreads.size();
+        }
+    }
+
+    abstract class AbstractServerThread extends Thread {
+        protected Process process;
+
+        abstract void clear();
     }
 }

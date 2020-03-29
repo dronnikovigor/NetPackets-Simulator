@@ -42,9 +42,7 @@ public class PureTcpDataTransferTestStand extends AbstractCommonFileSendingTestS
         /* server init */
         Configuration.Device serverDevice = testContext.configuration.getServer(serverId);
         try {
-            serverThread = new ServerThread(serverDevice);
-            serverDevice.tcpPort = serverThread.getPort();
-            serverThread.start();
+            initServer(serverDevice);
         } catch (IOException e) {
             return new TestResult("Error while binding server: " + e, 0, rtt, fileSize, reqAmount,
                     lossParams, null);
@@ -71,6 +69,13 @@ public class PureTcpDataTransferTestStand extends AbstractCommonFileSendingTestS
         if (serverThread != null) {
             serverThread.interrupt();
         }
+    }
+
+    @Override
+    void initServer(Configuration.Device device) throws IOException {
+        serverThread = new ServerThread(device);
+        device.tcpPort = serverThread.getPort();
+        serverThread.start();
     }
 
     private class ClientThread extends AbstractClientThread {

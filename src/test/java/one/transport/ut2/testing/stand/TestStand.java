@@ -101,6 +101,11 @@ class TestStand {
         executeTest(new QuicDataTransferTestStand());
     }
 
+    @Test
+    void QuicQuicheDataTransferTest() {
+        executeTest(new QuicQuicheDataTransferTestStand());
+    }
+
     private void executeTest(AbstractTestStand test) {
         LOGGER.info(test.getClass().getSimpleName() + " started");
         TestContext.TestResult testResult = null;
