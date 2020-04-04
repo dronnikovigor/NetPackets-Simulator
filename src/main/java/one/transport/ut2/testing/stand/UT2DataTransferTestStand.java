@@ -30,7 +30,7 @@ public class UT2DataTransferTestStand extends AbstractFileSendingTestStand {
         for (Configuration.Device clientDevice : testContext.configuration.getClients()) {
             writeClientConfiguration(clientDevice, serverDevice);
             initClientProcess();
-            Thread.sleep(1000);
+            //Thread.sleep(1000);
         }
 
         UT2ServerSide ut2ServerSide = null;
@@ -82,18 +82,17 @@ public class UT2DataTransferTestStand extends AbstractFileSendingTestStand {
         }
 
         final long finishTime = System.currentTimeMillis();
-        testResult.resultTime = finishTime - startTime;
-        testResult.success = true;
 
-        Thread.sleep(1000);
-
+        //if test isn't success, this will return false
         for (int i = 0; i < testContext.configuration.getClients().length; i++) {
             sendCommand(i, ClientInterface.exit());
             if (!waitForClientProcess(i, 60_000))
-                return new TestResult("Client terminated", finishTime - startTime, rtt, fileSize,
+                return new TestResult("Client terminated: " + getError(), 0, rtt, fileSize,
                         reqAmount, lossParams, null);
         }
 
+        testResult.success = true;
+        testResult.resultTime = finishTime - startTime;
         testResult.packetLoss.fromClients = testContext.tunnelInterface.statistic.clients.getPacketLoss();
         testResult.packetLoss.fromServers = testContext.tunnelInterface.statistic.servers.getPacketLoss();
 

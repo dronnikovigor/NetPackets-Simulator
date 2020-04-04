@@ -97,6 +97,7 @@ public class PureTcpDataTransferTestStand extends AbstractCommonFileSendingTestS
             } catch (IOException e) {
                 testResult = new TestResult("Error while binding client: " + e, 0, rtt, fileSize, reqAmount,
                         lossParams, null);
+                return;
             }
             try {
                 byte[] serverAddr2Bytes = clientConf.getNetAddr();
@@ -107,6 +108,7 @@ public class PureTcpDataTransferTestStand extends AbstractCommonFileSendingTestS
             } catch (IOException e) {
                 testResult = new TestResult("Error while connecting client: " + e, 0, rtt, fileSize,
                         reqAmount, lossParams, null);
+                return;
             }
             try {
                 is = socket.getInputStream();

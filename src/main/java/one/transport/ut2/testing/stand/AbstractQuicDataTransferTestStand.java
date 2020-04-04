@@ -70,7 +70,7 @@ public abstract class AbstractQuicDataTransferTestStand extends AbstractCommonFi
         try {
             initServer(serverDevice);
             /* waiting server to start */
-            Thread.sleep(2000);
+            Thread.sleep(1000);
         } catch (IOException | InterruptedException e) {
             return new TestResult("Error while binding server: " + e, 0, rtt, fileSize, reqAmount,
                     lossParams, null);

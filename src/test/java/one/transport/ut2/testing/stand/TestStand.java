@@ -133,7 +133,9 @@ class TestStand {
                                 } finally {
                                     allTestsResults.computeIfAbsent(test.getClass().getSimpleName(), k ->
                                             new ArrayList<>()).add(testResult);
-                                    LOGGER.info("Test case finished with time " + testResult.resultTime + "ms");
+                                    LOGGER.info("Test case finished with time " + testResult.resultTime + "ms, result: " + testResult.success);
+                                    if (!testResult.success)
+                                        LOGGER.error("Error: " + testResult.error);
                                     test.clear();
                                 }
                                 tunnelInterface.stop();

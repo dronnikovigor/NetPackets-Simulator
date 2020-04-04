@@ -8,6 +8,8 @@ import one.transport.ut2.testing.entity.impl.UT2ServerSide;
 import one.transport.ut2.testing.tunnel.TunnelInterface;
 import one.transport.ut2.testing.utils.IpUtils;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.file.Files;
@@ -64,24 +66,27 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
     }
 
     void initClientProcess() throws IOException {
-        Path errFile = logDir.resolve("error_" + (clientProcesses.size() + 1) + ".txt");
-        Path outFile = logDir.resolve("output_" + (clientProcesses.size() + 1) + ".txt");
-
-        Files.createFile(errFile);
-        Files.createFile(outFile);
-
         final ClientProcess clientProcess = new ClientProcess();
-        clientProcess.process = new ProcessBuilder()
-                .directory(testContext.clientDir.toFile())
-                //.command("/bin/bash", "-c", "valgrind --log-file=\"" + logDir.toAbsolutePath().toString() + "/valgrind_report.txt\" ./build/client")
-                //todo add possibility to run without valgrind
-                .command("/bin/bash", "-c", "./build/client")
-                .redirectError(errFile.toFile())
-                .redirectOutput(outFile.toFile())
-                .start();
-        clientProcess.stdIn = new OutputStreamWriter(clientProcess.process.getOutputStream());
-
+        clientProcess.start();
         clientProcesses.add(clientProcess);
+    }
+
+    String getError() {
+        StringBuilder result = new StringBuilder();
+        for (ClientProcess clientProcess : clientProcesses) {
+            try (BufferedReader bufferedReader = new BufferedReader(new FileReader(clientProcess.errFile.toFile()))) {
+                while (true) {
+                    String line = bufferedReader.readLine();
+                    if (line != null) {
+                        result.append(line).append(" \n");
+                    } else
+                        break;
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return result.toString();
     }
 
     @Override
@@ -123,8 +128,10 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
 
     final void sendCommand(int id, String command) {
         try {
-            clientProcesses.get(id).stdIn.write(command);
-            clientProcesses.get(id).stdIn.flush();
+            if (clientProcesses.get(id).process.isAlive()) {
+                clientProcesses.get(id).stdIn.write(command);
+                clientProcesses.get(id).stdIn.flush();
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -145,9 +152,34 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
         Configuration.writeClientConfiguration(ut2Mode, testContext.clientConfigFile, client, servers);
     }
 
-    private static class ClientProcess {
+    private class ClientProcess {
+        private ProcessBuilder processBuilder;
         private Process process;
         private OutputStreamWriter stdIn;
+
+        private Path errFile;
+        private Path outFile;
+
+        ClientProcess() throws IOException {
+            errFile = logDir.resolve("error_" + (clientProcesses.size() + 1) + ".txt");
+            outFile = logDir.resolve("output_" + (clientProcesses.size() + 1) + ".txt");
+
+            Files.createFile(errFile);
+            Files.createFile(outFile);
+
+            processBuilder = new ProcessBuilder()
+                    .directory(testContext.clientDir.toFile())
+                    //.command("/bin/bash", "-c", "valgrind --log-file=\"" + logDir.toAbsolutePath().toString() + "/valgrind_report.txt\" ./build/client")
+                    //todo add possibility to run without valgrind
+                    .command("/bin/bash", "-c", "./build/client")
+                    .redirectError(errFile.toFile())
+                    .redirectOutput(outFile.toFile());
+        }
+
+        public void start() throws IOException {
+            process = processBuilder.start();
+            stdIn = new OutputStreamWriter(process.getOutputStream());
+        }
     }
 
 }
