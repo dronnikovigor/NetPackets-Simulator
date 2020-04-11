@@ -3,7 +3,9 @@ package one.transport.ut2.testing.stand;
 import one.transport.ut2.testing.entity.Configuration;
 import one.transport.ut2.testing.entity.TestContext;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.InetAddress;
 
 import static one.transport.ut2.testing.ApplicationProperties.applicationProps;
@@ -19,7 +21,10 @@ public class QuicQuicheDataTransferTestStand extends AbstractQuicDataTransferTes
     protected class ServerThread extends AbstractServerThread {
         private String[] cmd;
 
-        protected ServerThread(Configuration.Device device) throws IOException {
+        private int port;
+
+        ServerThread(Configuration.Device device) throws IOException {
+            port = device.udpPort;
             cmd = new String[]{"/bin/sh", "-c",
                     "cd " + applicationProps.getProperty("quiche.home.folder") + ";" +
                             " cargo run" +
@@ -43,8 +48,24 @@ public class QuicQuicheDataTransferTestStand extends AbstractQuicDataTransferTes
 
         @Override
         public void clear() {
-            if (process != null && process.isAlive())
-                process.destroy();
+            try {
+                Process findProcess = Runtime.getRuntime().exec("lsof -i");
+
+                BufferedReader stdInput = new BufferedReader(new
+                        InputStreamReader(findProcess.getInputStream()));
+                String line;
+                while ((line = stdInput.readLine()) != null) {
+                    if (line.contains(":"+port)) {
+                        int firstIndex = line.indexOf(" ");
+                        int secondIndex = line.indexOf(" ", firstIndex+1);
+                        String result = line.substring(firstIndex, secondIndex);
+
+                        Runtime.getRuntime().exec("kill " + result);
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
