@@ -23,17 +23,24 @@ import java.util.concurrent.TimeUnit;
 import static one.transport.ut2.testing.ApplicationProperties.applicationProps;
 
 public abstract class AbstractUT2TestStand extends AbstractTestStand {
-    UT2Mode ut2Mode;
-    private List<ClientProcess> clientProcesses = new ArrayList<>();
+    protected UT2Mode ut2Mode;
+    private final List<ClientProcess> clientProcesses = new ArrayList<>();
+
+    protected UT2ServerSide[] serverSides;
+
+    private Path clientDir;
+    private Path clientConfigurationDir;
 
     @Override
-    public void init(Configuration configuration, TunnelInterface tunnelInterface) {
+    public void init(Configuration configuration, TunnelInterface tunnelInterface) throws TestErrorException {
+        super.init(configuration, tunnelInterface);
+
         final Configuration.Device[] serversDevices = configuration.getServers();
-        UT2ServerSide[] ut2ServerSides = new UT2ServerSide[serversDevices.length];
-        for (int i = 0; i < ut2ServerSides.length; ++i) {
+        serverSides = new UT2ServerSide[serversDevices.length];
+        for (int i = 0; i < serverSides.length; ++i) {
             Configuration.Device serverDevice = serversDevices[i];
-            ut2ServerSides[i] = new UT2ServerSide(Executors.newSingleThreadExecutor(), ut2Mode);
-            ut2ServerSides[i].initServer(serverDevice);
+            serverSides[i] = new UT2ServerSide(Executors.newSingleThreadExecutor(), ut2Mode);
+            serverSides[i].initServer(serverDevice);
 
             ClusterHost2.Builder builder = new ClusterHost2.Builder();
             /* set all ip with client net addr */
@@ -44,34 +51,28 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
             /* */
             builder.instanceId = 0xFF & serverDevice.getHostAddr();
             if (ut2Mode == UT2Mode.UDP)
-                builder.udpPort = ut2ServerSides[i].getBindUdpPort();
+                builder.udpPort = serverSides[i].getBindUdpPort();
             else
-                builder.tcpPort = ut2ServerSides[i].getBindTcpPort();
+                builder.tcpPort = serverSides[i].getBindTcpPort();
             builder.status = ClusterHostStatus.running;
             /* */
             ClusterHost2 host = new ClusterHost2(builder);
             ClusterUtils.hosts.put(host, true);
         }
 
-        Path clientDir = Paths.get("").resolve(applicationProps.getProperty("ut2.client.dir"));
-        Path clientConfigurationDir = Paths.get(clientDir + applicationProps.getProperty("ut2.client.configuration"));
+        clientDir = Paths.get("").resolve(applicationProps.getProperty("ut2.client.dir"));
+        clientConfigurationDir = Paths.get(clientDir + applicationProps.getProperty("ut2.client.configuration"));
 
-        this.testContext = new TestContext(
-                configuration,
-                clientDir,
-                clientConfigurationDir,
-                ut2ServerSides,
-                tunnelInterface,
-                new ArrayList<>());
+        generateTestFiles(null);
     }
 
-    void initClientProcess() throws IOException {
+    protected void initClientProcess() throws TestErrorException {
         final ClientProcess clientProcess = new ClientProcess();
         clientProcess.start();
         clientProcesses.add(clientProcess);
     }
 
-    String getError() {
+    protected String getError() {
         StringBuilder result = new StringBuilder();
         for (ClientProcess clientProcess : clientProcesses) {
             try (BufferedReader bufferedReader = new BufferedReader(new FileReader(clientProcess.errFile.toFile()))) {
@@ -90,7 +91,7 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
     }
 
     @Override
-    public void clear() {
+    public void clear() throws TestErrorException {
         clientProcesses.forEach(clientProcess -> {
             if (clientProcess.process != null) {
                 clientProcess.process.destroy();
@@ -100,7 +101,7 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
 
         super.clear();
 
-        for (ServerSide serverSide : testContext.serverSides) {
+        for (ServerSide serverSide : serverSides) {
             try {
                 serverSide.clear();
             } catch (InterruptedException e) {
@@ -116,7 +117,7 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
         return waitForClientProcess(id, millis);
     }
 
-    boolean waitForClientProcess(int id, long millis) {
+    protected boolean waitForClientProcess(int id, long millis) {
         boolean finished = false;
         try {
             finished = clientProcesses.get(id).process.waitFor(millis, TimeUnit.MILLISECONDS);
@@ -126,7 +127,7 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
         return finished && clientProcesses.get(id).process.exitValue() == 0;
     }
 
-    final void sendCommand(int id, String command) {
+    protected final void sendCommand(int id, String command) {
         try {
             if (clientProcesses.get(id).process.isAlive()) {
                 clientProcesses.get(id).stdIn.write(command);
@@ -148,8 +149,8 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
         }
     }
 
-    final void writeClientConfiguration(Configuration.Device client, Configuration.Device... servers) throws IOException {
-        Configuration.writeClientConfiguration(ut2Mode, testContext.clientConfigFile, client, servers);
+    protected final void writeClientConfiguration(Configuration.Device client, Configuration.Device... servers) throws TestErrorException {
+        Configuration.writeClientConfiguration(ut2Mode, clientConfigurationDir, client, servers);
     }
 
     private class ClientProcess {
@@ -157,28 +158,36 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
         private Process process;
         private OutputStreamWriter stdIn;
 
-        private Path errFile;
-        private Path outFile;
+        private final Path errFile;
+        private final Path outFile;
 
-        ClientProcess() throws IOException {
+        ClientProcess() throws TestErrorException {
             errFile = logDir.resolve("error_" + (clientProcesses.size() + 1) + ".txt");
             outFile = logDir.resolve("output_" + (clientProcesses.size() + 1) + ".txt");
 
-            Files.createFile(errFile);
-            Files.createFile(outFile);
+            try {
+                Files.createFile(errFile);
+                Files.createFile(outFile);
 
-            processBuilder = new ProcessBuilder()
-                    .directory(testContext.clientDir.toFile())
-                    //.command("/bin/bash", "-c", "valgrind --log-file=\"" + logDir.toAbsolutePath().toString() + "/valgrind_report.txt\" ./build/client")
-                    //todo add possibility to run without valgrind
-                    .command("/bin/bash", "-c", "./build/client")
-                    .redirectError(errFile.toFile())
-                    .redirectOutput(outFile.toFile());
+                processBuilder = new ProcessBuilder()
+                        .directory(clientDir.toFile())
+                        //.command("/bin/bash", "-c", "valgrind --log-file=\"" + logDir.toAbsolutePath().toString() + "/valgrind_report.txt\" ./build/client")
+                        //todo add possibility to run without valgrind
+                        .command("/bin/bash", "-c", "./build/client")
+                        .redirectError(errFile.toFile())
+                        .redirectOutput(outFile.toFile());
+            } catch (IOException e) {
+                throw new TestErrorException("Error while creating log files for client: " + e);
+            }
         }
 
-        public void start() throws IOException {
-            process = processBuilder.start();
-            stdIn = new OutputStreamWriter(process.getOutputStream());
+        void start() throws TestErrorException {
+            try {
+                process = processBuilder.start();
+                stdIn = new OutputStreamWriter(process.getOutputStream());
+            } catch (IOException e) {
+                throw new TestErrorException("Error while starting client: " + e);
+            }
         }
     }
 

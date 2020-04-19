@@ -8,7 +8,7 @@ import java.util.Deque;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 public class CongestionControlWindowImpl implements CongestionControlWindow {
-    private Deque<TunnelInterface.PacketWithTimestamp> deque = new ConcurrentLinkedDeque<>();
+    private final Deque<TunnelInterface.PacketWithTimestamp> deque = new ConcurrentLinkedDeque<>();
 
     private int capacity = 1048576;
     private int currentSize;
@@ -51,5 +51,10 @@ public class CongestionControlWindowImpl implements CongestionControlWindow {
     @Override
     public void setCapacity(int newCapacity) {
         capacity = newCapacity;
+    }
+
+    @Override
+    public int getCapacity() {
+        return capacity;
     }
 }

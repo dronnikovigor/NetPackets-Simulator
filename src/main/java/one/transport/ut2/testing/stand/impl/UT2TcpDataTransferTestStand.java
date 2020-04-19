@@ -1,4 +1,4 @@
-package one.transport.ut2.testing.stand;
+package one.transport.ut2.testing.stand.impl;
 
 import one.transport.ut2.testing.entity.UT2Mode;
 

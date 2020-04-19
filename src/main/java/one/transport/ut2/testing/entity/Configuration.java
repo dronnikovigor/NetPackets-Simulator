@@ -228,7 +228,7 @@ public class Configuration {
         }
     }
 
-    public static void writeClientConfiguration(UT2Mode ut2mode, Path clientConf, Device client, Device... serversDevices) throws IOException {
+    public static void writeClientConfiguration(UT2Mode ut2mode, Path clientConf, Device client, Device... serversDevices) throws TestErrorException {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
         JsonObject obj = new JsonObject();
@@ -251,9 +251,11 @@ public class Configuration {
         JsonElement element = gson.toJsonTree(servers, UT2ServerSide[].class);
         obj.add("servers", element);
 
-        JsonWriter jsonWriter = gson.newJsonWriter(new FileWriter(clientConf.toFile()));
-        gson.toJson(obj, jsonWriter);
-        jsonWriter.close();
+        try (JsonWriter jsonWriter = gson.newJsonWriter(new FileWriter(clientConf.toFile()))){
+            gson.toJson(obj, jsonWriter);
+        } catch (IOException e) {
+            throw new TestErrorException("Error while creating configuration file " + e);
+        }
     }
 
     private static class ServerParam {
@@ -265,5 +267,4 @@ public class Configuration {
             this.port = port;
         }
     }
-
 }

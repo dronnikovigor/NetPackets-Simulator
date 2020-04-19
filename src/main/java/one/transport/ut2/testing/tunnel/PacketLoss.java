@@ -78,18 +78,18 @@ public class PacketLoss {
         }
 
         public String getName() {
-            return ("x_" + x0 + "_up_" + up + "_down_" + down).replaceAll("-", "_");
+            return ("/loss " + enabled + "/x_" + x0 + "/up_" + up + "/down_" + down + "/intervals " + intervals + "/" + interval);
         }
 
         @Override
         public String toString() {
             return "LossParams{" +
-                    "x0=" + x0 +
+                    "enabled=" + enabled +
+                    ", x0=" + x0 +
                     ", up=" + up +
                     ", down=" + down +
-                    ", interval=" + interval +
-                    ", enabled=" + enabled +
                     ", intervals=" + intervals +
+                    ", interval=" + interval +
                     '}';
         }
 

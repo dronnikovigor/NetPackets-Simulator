@@ -19,7 +19,7 @@ This network packet simulator support such features as:
 * JDK 8 or higher (note to set $JAVA_HOME to PATH)
 ##### Optionally
 * `valgrid` - for checking memory leaks
-* `tshark` - for dumping packets
+* `tshark` - for dumping packets (NB: https://gist.github.com/MinaMikhailcom/0825906230cbbe478faf4d08abe9d11a)
 * built QUIC from Chromium sources for QUIC tests (check for it: https://www.chromium.org/quic/playing-with-quic)
 * built QUICHE from sources for QUICHE tests (check for it: https://github.com/cloudflare/quiche)
 

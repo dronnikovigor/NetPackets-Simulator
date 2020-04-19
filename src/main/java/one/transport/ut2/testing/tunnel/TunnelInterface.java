@@ -33,12 +33,14 @@ public class TunnelInterface {
     public int bandwidth;
     public double speedRate;
     public PacketLoss.LossParams lossParams;
-    private CongestionControlWindow congestionControlWindow = new CongestionControlWindowImpl();
+    private final CongestionControlWindow congestionControlWindow = new CongestionControlWindowImpl();
     /* threads */
     @Nullable
     private ReceivingThread receivingThread = null;
     @Nullable
     private SendingThread sendingThread = null;
+
+    public boolean packetStat = false;
 
     public TunnelInterface(@NotNull Tunnel tunnel, @NotNull Configuration.Device[] devices) {
         this.tunnel = tunnel;
@@ -47,6 +49,10 @@ public class TunnelInterface {
 
     public void setCongestionControlWindowCapacity(int capacity) {
         congestionControlWindow.setCapacity(capacity);
+    }
+
+    public int getCongestionControlWindowCapacity() {
+        return congestionControlWindow.getCapacity();
     }
 
     private double calcDelay() {
@@ -97,8 +103,8 @@ public class TunnelInterface {
             return;
         }
 
-        /* collecting UDP stat */
-        if (packet.protocol == Packet.Protocol.UDP) {
+        /* collecting UT2 stat */
+        if (packetStat && packet.protocol == Packet.Protocol.UDP) {
             final int srcId = packet.getSrcAddress()[3] & 0xFF;
             final String magic = packet.getMagic();
 
