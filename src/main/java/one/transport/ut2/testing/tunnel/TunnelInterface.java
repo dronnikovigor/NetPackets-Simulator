@@ -4,6 +4,7 @@ import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Bucket4j;
 import one.transport.ut2.testing.entity.Configuration;
+import one.transport.ut2.testing.entity.TestErrorException;
 import one.transport.ut2.testing.tunnel.impl.CongestionControlWindowImpl;
 import one.transport.ut2.testing.tunnel.jni.Tunnel;
 import org.jetbrains.annotations.NotNull;
@@ -11,6 +12,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.Deque;
 import java.util.HashMap;
@@ -105,16 +108,29 @@ public class TunnelInterface {
 
         /* collecting UT2 stat */
         if (packetStat && packet.protocol == Packet.Protocol.UDP) {
-            final int srcId = packet.getSrcAddress()[3] & 0xFF;
             final String magic = packet.getMagic();
-
-            statistic.clients.ut2PacketsStat.compute(srcId, (key, map) -> {
-                if (map == null) {
-                    map = new HashMap<>();
+            try {
+                String address = InetAddress.getByAddress(packet.getSrcAddress()).getHostAddress();
+                if (srcDevice.type == Configuration.Device.Type.CLIENT) {
+                    statistic.clients.ut2PacketsStat.compute(address, (key, map) -> {
+                        if (map == null) {
+                            map = new HashMap<>();
+                        }
+                        map.compute(magic, (magicKey, counter) -> counter == null ? 1 : counter + 1);
+                        return map;
+                    }) ;
+                } else if (srcDevice.type == Configuration.Device.Type.SERVER) {
+                    statistic.servers.ut2PacketsStat.compute(address, (key, map) -> {
+                        if (map == null) {
+                            map = new HashMap<>();
+                        }
+                        map.compute(magic, (magicKey, counter) -> counter == null ? 1 : counter + 1);
+                        return map;
+                    });
                 }
-                map.compute(magic, (magicKey, counter) -> counter == null ? 1 : counter + 1);
-                return map;
-            });
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            }
         }
 
         if (srcDevice.type == Configuration.Device.Type.CLIENT) {
@@ -165,14 +181,13 @@ public class TunnelInterface {
         receivingThread = new ReceivingThread();
         sendingThread = new SendingThread();
 
-
         receivingThread.start();
         sendingThread.start();
     }
 
-    public void stop() {
+    public void stop() throws TestErrorException {
         if (receivingThread == null || sendingThread == null) {
-            throw new IllegalStateException("Interface isn't running");
+            throw new IllegalStateException("Interface isn't running.");
         }
         receivingThread.interrupt();
         sendingThread.interrupt();
@@ -181,15 +196,13 @@ public class TunnelInterface {
             receivingThread.join();
             receivingThread = null;
         } catch (InterruptedException e) {
-            //todo log
-            e.printStackTrace();
+            throw new TestErrorException("Interrupted receivingThread: " + e);
         }
         try {
             sendingThread.join();
             sendingThread = null;
         } catch (InterruptedException e) {
-            //todo log
-            e.printStackTrace();
+            throw new TestErrorException("Interrupted receivingThread: " + e);
         }
     }
 
@@ -199,6 +212,7 @@ public class TunnelInterface {
                 "rtt=" + rtt +
                 ", bandwidth=" + bandwidth +
                 ", speedRate=" + speedRate +
+                ", congestionControlWindow=" + congestionControlWindow +
                 ", lossParams=" + lossParams +
                 '}';
     }
@@ -257,7 +271,7 @@ public class TunnelInterface {
         }
 
         public static class Clients {
-            final Map<Integer, HashMap<String, Integer>> ut2PacketsStat;
+            final Map<String, HashMap<String, Integer>> ut2PacketsStat;
             long recvFromClients;
             long processedFromClients;
             long sentToServers;
@@ -289,6 +303,7 @@ public class TunnelInterface {
         }
 
         public static class Servers {
+            final Map<String, HashMap<String, Integer>> ut2PacketsStat;
             long recvFromServers;
             long processedFromServers;
             long sentToClients;
@@ -296,6 +311,7 @@ public class TunnelInterface {
             long betweenServers;
 
             Servers() {
+                this.ut2PacketsStat = new HashMap<>();
             }
 
             Servers(Servers servers) {
@@ -303,6 +319,8 @@ public class TunnelInterface {
                 this.processedFromServers = servers.processedFromServers;
                 this.sentToClients = servers.sentToClients;
                 this.betweenServers = servers.betweenServers;
+
+                this.ut2PacketsStat = new HashMap<>(servers.ut2PacketsStat);
             }
 
             void clear() {
@@ -311,6 +329,7 @@ public class TunnelInterface {
                 sentToClients = 0;
 
                 betweenServers = 0;
+                ut2PacketsStat.clear();
             }
 
             public double getPacketLoss() {

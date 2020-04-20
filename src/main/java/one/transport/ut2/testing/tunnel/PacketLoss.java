@@ -78,7 +78,7 @@ public class PacketLoss {
         }
 
         public String getName() {
-            return ("/loss " + enabled + "/x_" + x0 + "/up_" + up + "/down_" + down + "/intervals " + intervals + "/" + interval);
+            return ("/loss " + enabled + "/x " + x0 + "/up " + up + "/down " + down + "/intervals " + intervals + "/" + interval);
         }
 
         @Override

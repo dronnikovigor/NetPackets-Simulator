@@ -6,10 +6,9 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import one.transport.ut2.testing.cluster.ClusterHost2;
 import one.transport.ut2.testing.cluster.ClusterUtils;
+import one.transport.ut2.testing.tunnel.Packet;
 import one.transport.ut2.testing.tunnel.PacketLoss;
 import one.transport.ut2.testing.utils.IpUtils;
-import one.transport.ut2.testing.entity.impl.UT2ServerSide;
-import one.transport.ut2.testing.tunnel.Packet;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -69,18 +68,6 @@ public class Configuration {
         try {
             JsonReader jsonReader = gson.newJsonReader(new FileReader(configurationFile));
             return gson.fromJson(jsonReader, Configuration.class);
-//            JsonObject obj = gson.fromJson(jsonReader, JsonObject.class);
-//
-//            Device[] devices = gson.fromJson(obj.getAsJsonArray("devices"), Device[].class);
-//            if (devices == null || devices.length == 0) {
-//                return null;
-//            } else {
-//                for (Device device : devices) {
-//                    device.active = true;
-//                }
-//            }
-//
-//            return new Configuration(runUntilFirstError, devices);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -215,7 +202,6 @@ public class Configuration {
         }
 
         static class TypeSerializer implements JsonDeserializer<Type> {
-
             @Override
             public Type deserialize(JsonElement json, java.lang.reflect.Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
                 for (Type type : Type.values()) {
@@ -248,7 +234,7 @@ public class Configuration {
             i++;
         }
 
-        JsonElement element = gson.toJsonTree(servers, UT2ServerSide[].class);
+        JsonElement element = gson.toJsonTree(servers, ServerParam[].class);
         obj.add("servers", element);
 
         try (JsonWriter jsonWriter = gson.newJsonWriter(new FileWriter(clientConf.toFile()))){
