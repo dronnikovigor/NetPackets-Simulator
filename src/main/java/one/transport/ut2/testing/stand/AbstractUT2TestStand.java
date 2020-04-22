@@ -74,6 +74,11 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
 
         for (Configuration.Device clientDevice : configuration.getClients()) {
             initClientProcess(clientDevice, configuration.getServers());
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
 
         UT2ServerSide ut2ServerSide = null;

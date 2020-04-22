@@ -50,7 +50,7 @@ public abstract class AbstractQuicDataTransferTestStand extends AbstractCommonFi
             serverThread = initServer(serverDevice);
             serverThread.start();
             /* waiting server to start */
-            Thread.sleep(500);
+            Thread.sleep(1000);
         } catch (InterruptedException e) {
             throw new TestErrorException("Error while binding server: " + e);
         }

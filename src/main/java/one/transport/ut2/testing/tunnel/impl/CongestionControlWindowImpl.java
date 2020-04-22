@@ -57,4 +57,11 @@ public class CongestionControlWindowImpl implements CongestionControlWindow {
     public int getCapacity() {
         return capacity;
     }
+
+    @Override
+    public String toString() {
+        return "CongestionControlWindowImpl{" +
+                "capacity=" + capacity +
+                '}';
+    }
 }

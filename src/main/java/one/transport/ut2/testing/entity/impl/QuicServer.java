@@ -25,7 +25,7 @@ public class QuicServer extends AbstractServer {
                             applicationProps.getProperty("quic.server.binary"),
                             "--quic_response_cache_dir=" + applicationProps.getProperty("temp.data.folder"),
                             "--certificate_file=" + applicationProps.getProperty("quic.certs.file"),
-                            "--key_file=" + applicationProps.getProperty("quic.key.file"),
+                            "--key_file=" + applicationProps.getProperty("quic.pkcs8.file"),
                             "--quic_ieft_draft=27",
                             "--quic_verions=h3-27",
                             "--host=" + InetAddress.getByAddress(device.getIpBytes()).getHostAddress(),

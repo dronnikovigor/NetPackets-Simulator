@@ -23,8 +23,8 @@ public class QuicheServer extends AbstractServer {
             cmd = new String[]{"/bin/sh", "-c",
                     "cd " + applicationProps.getProperty("quiche.home.folder") + ";" +
                             applicationProps.getProperty("quiche.server.binary") +
-                            " --cert " + applicationProps.getProperty("quiche.cert.file") +
-                            " --key " + applicationProps.getProperty("quiche.key.file") +
+                            " --cert " + applicationProps.getProperty("quic.certs.file") +
+                            " --key " + applicationProps.getProperty("quic.key.file") +
                             " --listen " + InetAddress.getByAddress(device.getIpBytes()).getHostAddress() + ":" + device.udpPort +
                             " --root " + applicationProps.getProperty("temp.data.folder")};
             port = device.udpPort;
