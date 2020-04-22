@@ -21,6 +21,24 @@ This network packet simulator support such features as:
 * `valgrid` - for checking memory leaks
 * `tshark` - for dumping packets (NB: https://gist.github.com/MinaMikhailcom/0825906230cbbe478faf4d08abe9d11a)
 * built QUIC from Chromium sources for QUIC tests (check for it: https://www.chromium.org/quic/playing-with-quic)
+    Also, before starting QUIC tests it's needed to generate certificates and add them to CA store.
+    1. Run:
+        ```
+        ${PATH_TO_CHROMIUM}/src/net/tools/quic/generate-certs.sh
+        ```
+    2. Run:
+        ```
+        sudo apt install libnss3-tools
+        ```
+    3. Run
+        ```
+       sudo bash add-certs-to-stores.sh ${PATH_TO_CHROMIUM}/src/net/tools/quic/certs/out/2048-sha256-root.pem "QUIC Server Root CA"
+        ``` 
+       
+    Next times it can be set up using (remember to configure paths in script:
+    ```
+    ./set_up_quic.sh
+    ```
 * built QUICHE from sources for QUICHE tests (check for it: https://github.com/cloudflare/quiche)
 
 ### How to run
@@ -52,6 +70,10 @@ This network packet simulator support such features as:
    * QUIC->QUICHE:
     ```
     ./gradlew cleanTest test --tests "one.transport.ut2.testing.stand.TestStand.QuicQuicheDataTransferTest" --info
+    ```
+   * QUICHE:
+    ```
+    ./gradlew cleanTest test --tests "one.transport.ut2.testing.stand.TestStand.QuicheDataTransferTest" --info
     ```
 4. Set down environment:
     ```

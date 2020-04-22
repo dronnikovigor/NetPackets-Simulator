@@ -21,7 +21,6 @@ public class QuicClient extends AbstractQuicClient {
                     .directory(logDir.toFile())
                     .command(
                             applicationProps.getProperty("quic.client.binary"),
-                            "--disable_certificate_verification",
                             "--allow_unknown_root_cert",
                             "--quiet",
                             "--quic_ieft_draft=27",
