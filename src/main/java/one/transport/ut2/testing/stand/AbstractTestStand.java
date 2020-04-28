@@ -3,6 +3,7 @@ package one.transport.ut2.testing.stand;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.stream.JsonWriter;
+import one.transport.ut2.testing.entity.AbstractClient;
 import one.transport.ut2.testing.entity.Configuration;
 import one.transport.ut2.testing.entity.TestErrorException;
 import one.transport.ut2.testing.entity.TestResult;
@@ -14,6 +15,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static one.transport.ut2.testing.ApplicationProperties.applicationProps;
@@ -23,34 +26,23 @@ public abstract class AbstractTestStand {
 
     protected Configuration configuration;
     protected TunnelInterface tunnelInterface;
-    protected TestResult testResult;
 
     private Process tsharkProcess;
 
     protected byte serverId;
 
-    protected int fileSize;
     protected boolean packetStat;
 
     public void init(Configuration configuration, TunnelInterface tunnelInterface) throws TestErrorException {
         this.configuration = configuration;
         this.tunnelInterface = tunnelInterface;
+        AbstractClient.setReqAmount(configuration.reqAmount);
     }
 
-    public TestResult runTest(int fileSize) throws TestErrorException {
+    public List<TestResult> runTest() throws TestErrorException {
         serverId = (byte) 254;
-        this.fileSize = fileSize;
 
-        testResult = new TestResult();
-        testResult.fileSize = fileSize;
-        testResult.rtt = tunnelInterface.rtt;
-        testResult.requests = configuration.reqAmount;
-        testResult.lossParams = tunnelInterface.lossParams;
-        testResult.bandwidth = tunnelInterface.bandwidth;
-        testResult.speedRate = tunnelInterface.speedRate;
-        testResult.congestionControlWindow = tunnelInterface.getCongestionControlWindowCapacity();
-
-        initLogDir(applicationProps.getProperty("log.dir"), "fileSize " + fileSize + "KB/" + "rtt " + tunnelInterface.rtt + "ms/bandwidth " + tunnelInterface.bandwidth + "/congestionControl " + tunnelInterface.getCongestionControlWindowCapacity() + tunnelInterface.lossParams.getName());
+        initLogDir(applicationProps.getProperty("log.dir"),"rtt " + tunnelInterface.rtt + "ms/bandwidth " + tunnelInterface.bandwidth + "/congestionControl " + tunnelInterface.getCongestionControlWindowCapacity() + tunnelInterface.lossParams.getName());
 
         if (configuration.dumping) {
             try {
@@ -64,7 +56,7 @@ public abstract class AbstractTestStand {
             }
         }
 
-        return testResult;
+        return new ArrayList<>();
     }
 
     public void clear() throws TestErrorException {

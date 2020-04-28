@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public abstract class AbstractQuicDataTransferTestStand extends AbstractCommonFileSendingTestStand {
@@ -41,8 +42,8 @@ public abstract class AbstractQuicDataTransferTestStand extends AbstractCommonFi
     }
 
     @Override
-    public TestResult runTest(int fileSize) throws TestErrorException {
-        super.runTest(fileSize);
+    public List<TestResult> runTest() throws TestErrorException {
+        List<TestResult> testResults = super.runTest();
 
         /* server init */
         Configuration.Device serverDevice = configuration.getServer(serverId);
@@ -55,13 +56,17 @@ public abstract class AbstractQuicDataTransferTestStand extends AbstractCommonFi
             throw new TestErrorException("Error while binding server: " + e);
         }
 
-        /* clients init */
-        for (Configuration.Device configurationClient : configuration.getClients()) {
-            final AbstractClient clientThread = initClient(configurationClient, serverDevice);
-            clientThreads.add(clientThread);
+        for (int fileSize: configuration.fileSizes) {
+            /* clients init */
+            AbstractClient.setFileSize(fileSize);
+            for (Configuration.Device configurationClient : configuration.getClients()) {
+                final AbstractClient clientThread = initClient(configurationClient, serverDevice);
+                clientThreads.add(clientThread);
+            }
+            testResults.add(executeTest(fileSize));
         }
 
-        return runTest();
+        return testResults;
     }
 
     @Override

@@ -12,8 +12,8 @@ import static one.transport.ut2.testing.ApplicationProperties.applicationProps;
 
 public class QuicClient extends AbstractQuicClient {
 
-    public QuicClient(Configuration.Device clientConf, Configuration.Device serverConf, int id, Path logDir, int fileSize) throws TestErrorException {
-        super(id, logDir, fileSize);
+    public QuicClient(Configuration.Device clientConf, Configuration.Device serverConf, int id, Path logDir) throws TestErrorException {
+        super(id, logDir);
         try {
             final byte[] clientDeviceIpBytes = clientConf.getIpBytes();
             clientDeviceIpBytes[3] = serverConf.getIpBytes()[3];

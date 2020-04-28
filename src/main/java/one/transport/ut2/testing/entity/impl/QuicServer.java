@@ -31,6 +31,10 @@ public class QuicServer extends AbstractServer {
                             "--host=" + InetAddress.getByAddress(device.getIpBytes()).getHostAddress(),
                             "--port=" + device.udpPort
                     );
+            Path clientErrFile = logDir.resolve("server_error.txt");
+            Path clientOutFile = logDir.resolve("server_output.txt");
+            processBuilder.redirectError(clientErrFile.toFile());
+            processBuilder.redirectOutput(clientOutFile.toFile());
             port = device.udpPort;
         } catch (UnknownHostException e) {
             throw new TestErrorException("Unknown Host: " + e);

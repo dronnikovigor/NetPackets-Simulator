@@ -2,13 +2,14 @@ package one.transport.ut2.testing.entity;
 
 
 import java.nio.file.Path;
+import java.util.Map;
 
 public abstract class AbstractServer extends Thread {
-    private final Path logDir;
+    protected final Path logDir;
     protected TestResult testResult;
 
     protected int port;
-    protected byte[] fileData;
+    protected Map<Integer, byte[]> filesData;
 
     protected AbstractServer(Path logDir) {
         testResult = new TestResult();
@@ -17,8 +18,8 @@ public abstract class AbstractServer extends Thread {
 
     public abstract void clear() throws TestErrorException;
 
-    public void setFileData(byte[] fileData) {
-        this.fileData = fileData;
+    public void setFilesData(Map<Integer, byte[]> filesData) {
+        this.filesData = filesData;
     }
 
     public TestResult getTestResult() {

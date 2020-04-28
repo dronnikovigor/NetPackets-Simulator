@@ -5,33 +5,44 @@ import one.transport.ut2.testing.entity.impl.PureTcpClient;
 import one.transport.ut2.testing.entity.impl.PureTcpServer;
 import one.transport.ut2.testing.stand.AbstractCommonFileSendingTestStand;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 public class PureTcpDataTransferTestStand extends AbstractCommonFileSendingTestStand {
     private final Random rnd = new Random();
 
     @Override
-    public TestResult runTest(int fileSize) throws TestErrorException {
-        super.runTest(fileSize);
+    public List<TestResult> runTest() throws TestErrorException {
+        List<TestResult> testResults = super.runTest();
 
-        byte[] fileData = new byte[fileSize * 1024];
-        rnd.nextBytes(fileData);
+        Map<Integer, byte[]> filesData = new HashMap<>();
+        for (int fileSize : configuration.fileSizes) {
+            byte[] fileData = new byte[fileSize * 1024];
+            rnd.nextBytes(fileData);
+            filesData.put(fileSize, fileData);
+        }
 
         /* server init */
         Configuration.Device serverDevice = configuration.getServer(serverId);
         serverThread = initServer(serverDevice);
-        serverThread.setFileData(fileData);
+        serverThread.setFilesData(filesData);
         serverThread.start();
 
-        /* clients init */
-        final Configuration.Device[] configurationClients = configuration.getClients();
-        for (Configuration.Device configurationClient : configurationClients) {
-            final AbstractClient clientThread = initClient(configurationClient, serverDevice);
-            clientThread.setFileData(fileData);
-            clientThreads.add(clientThread);
+        for (int fileSize: configuration.fileSizes) {
+            /* clients init */
+            AbstractClient.setFileSize(fileSize);
+            final Configuration.Device[] configurationClients = configuration.getClients();
+            for (Configuration.Device configurationClient : configurationClients) {
+                final AbstractClient clientThread = initClient(configurationClient, serverDevice);
+                clientThread.setFilesData(filesData);
+                clientThreads.add(clientThread);
+            }
+            testResults.add(executeTest(fileSize));
         }
 
-        return runTest();
+        return testResults;
     }
 
     @Override
@@ -55,8 +66,6 @@ public class PureTcpDataTransferTestStand extends AbstractCommonFileSendingTestS
 
     @Override
     protected AbstractClient initClient(Configuration.Device clientDevice, Configuration.Device serverDevice) throws TestErrorException {
-        return new PureTcpClient(clientDevice, serverDevice, clientThreads.size(), logDir, fileSize);
+        return new PureTcpClient(clientDevice, serverDevice, clientThreads.size(), logDir);
     }
-
-
 }

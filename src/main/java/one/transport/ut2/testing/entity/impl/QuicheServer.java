@@ -4,6 +4,7 @@ import one.transport.ut2.testing.entity.AbstractServer;
 import one.transport.ut2.testing.entity.Configuration;
 import one.transport.ut2.testing.entity.TestErrorException;
 import one.transport.ut2.testing.entity.TestResult;
+import one.transport.ut2.testing.utils.ProcessOutputStream;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -16,17 +17,19 @@ import static one.transport.ut2.testing.ApplicationProperties.applicationProps;
 
 public class QuicheServer extends AbstractServer {
     private String[] cmd;
+    private ProcessOutputStream outputGobbler;
 
     public QuicheServer(Configuration.Device device, Path logDir) throws TestErrorException {
         super(logDir);
         try {
             cmd = new String[]{"/bin/sh", "-c",
                     "cd " + applicationProps.getProperty("quiche.home.folder") + ";" +
-                            applicationProps.getProperty("quiche.server.binary") +
+                            " RUST_LOG=info " + applicationProps.getProperty("quiche.server.binary") +
                             " --cert " + applicationProps.getProperty("quic.certs.file") +
                             " --key " + applicationProps.getProperty("quic.key.file") +
                             " --listen " + InetAddress.getByAddress(device.getIpBytes()).getHostAddress() + ":" + device.udpPort +
-                            " --root " + applicationProps.getProperty("temp.data.folder")};
+                            " --root " + applicationProps.getProperty("temp.data.folder")
+            };
             port = device.udpPort;
         } catch (UnknownHostException e) {
             throw new TestErrorException("Unknown Host: " + e);
@@ -36,7 +39,9 @@ public class QuicheServer extends AbstractServer {
     @Override
     public void run() {
         try {
-            Runtime.getRuntime().exec(cmd);
+            Process process = Runtime.getRuntime().exec(cmd);
+            outputGobbler = new ProcessOutputStream(process.getErrorStream(), logDir.resolve("server_output.txt"));
+            outputGobbler.start();
             testResult.success = true;
         } catch (IOException e) {
             testResult = new TestResult("Error while starting server: " + e);
@@ -64,43 +69,10 @@ public class QuicheServer extends AbstractServer {
                     }
                 }
             }
+            outputGobbler.interrupt();
         } catch (IOException e) {
             e.printStackTrace();
         }
         throw new TestErrorException("Error while finishing server. PID not found!");
     }
 }
-
-//    public QuicheServer(Configuration.Device device, Path logDir) throws TestErrorException {
-//        super(logDir);
-//        try {
-//            processBuilder = new ProcessBuilder()
-//                    .directory(logDir.toFile())
-//                    .command(
-//                            applicationProps.getProperty("quiche.server.binary"),
-//                            " --cert " + applicationProps.getProperty("quiche.cert.file"),
-//                            " --key " + applicationProps.getProperty("quiche.key.file"),
-//                            " --listen " + InetAddress.getByAddress(device.getIpBytes()).getHostAddress() + ":" + device.udpPort,
-//                            " --root " + applicationProps.getProperty("quic.server.data.folder")
-//                    );
-//            port = device.udpPort;
-//        } catch (UnknownHostException e) {
-//            throw new TestErrorException("Unknown Host: " + e);
-//        }
-//    }
-//
-//    @Override
-//    public void run() {
-//        try {
-//            process = processBuilder.start();
-//            testResult.success = true;
-//        } catch (IOException e) {
-//            testResult = new TestResult("Error while starting server: " + e);
-//        }
-//    }
-//
-//    @Override
-//    public void clear() {
-//        if (process != null && process.isAlive())
-//            process.destroy();
-//    }

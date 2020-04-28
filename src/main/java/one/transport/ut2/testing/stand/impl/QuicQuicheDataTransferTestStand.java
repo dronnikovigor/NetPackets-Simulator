@@ -17,6 +17,6 @@ public class QuicQuicheDataTransferTestStand extends AbstractQuicDataTransferTes
 
     @Override
     protected AbstractClient initClient(Configuration.Device clientDevice, Configuration.Device serverDevice) throws TestErrorException {
-        return new QuicClient(clientDevice, serverDevice, clientThreads.size(), logDir, fileSize);
+        return new QuicClient(clientDevice, serverDevice, clientThreads.size(), logDir);
     }
 }

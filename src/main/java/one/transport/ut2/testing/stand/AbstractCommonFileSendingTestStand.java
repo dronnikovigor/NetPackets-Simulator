@@ -10,9 +10,7 @@ public abstract class AbstractCommonFileSendingTestStand extends AbstractTestSta
     protected final List<AbstractClient> clientThreads = new ArrayList<>();
     protected AbstractServer serverThread;
 
-    protected TestResult runTest() throws TestErrorException {
-        final long startTime = System.currentTimeMillis();
-        AbstractClient.setReqAmount(configuration.reqAmount);
+    protected TestResult executeTest(int fileSize) throws TestErrorException {
         clientThreads.forEach(Thread::start);
         for (AbstractClient clientThread : clientThreads) {
             try {
@@ -21,14 +19,24 @@ public abstract class AbstractCommonFileSendingTestStand extends AbstractTestSta
                 throw new TestErrorException("Error while join of client: " + e);
             }
         }
-        final long finishTime = System.currentTimeMillis();
 
-        setUpTestResult(finishTime - startTime);
+        TestResult testResult = setUpTestResult(fileSize);
 
+        clientThreads.forEach(AbstractClient::clear);
+        clientThreads.clear();
         return testResult;
     }
 
-    private void setUpTestResult(long resultTime) throws TestErrorException {
+    private TestResult setUpTestResult(int fileSize) throws TestErrorException {
+        TestResult testResult = new TestResult();
+        testResult.fileSize = fileSize;
+        testResult.rtt = tunnelInterface.rtt;
+        testResult.requests = configuration.reqAmount;
+        testResult.lossParams = tunnelInterface.lossParams;
+        testResult.bandwidth = tunnelInterface.bandwidth;
+        testResult.speedRate = tunnelInterface.speedRate;
+        testResult.congestionControlWindow = tunnelInterface.getCongestionControlWindowCapacity();
+
         testResult.success = clientThreads.stream().allMatch(clientThread -> clientThread.getTestResult().success)
                 && serverThread.getTestResult().success;
         for (AbstractClient abstractClient : clientThreads) {
@@ -36,23 +44,22 @@ public abstract class AbstractCommonFileSendingTestStand extends AbstractTestSta
         }
         if (!testResult.success) {
             StringBuilder error = new StringBuilder();
-            clientThreads.forEach(clientThread -> {
-                if (clientThread.getTestResult().error != null)
-                    error.append(clientThread.getTestResult().error).append(" ");
-            });
+            for (AbstractClient abstractClient : clientThreads) {
+                if (abstractClient.getTestResult().error != null)
+                    error.append(abstractClient.getTestResult().error).append(" ");
+                error.append(abstractClient.getError());
+            }
             testResult.error = error.toString();
         } else {
-            testResult.resultTime = resultTime;
+            long sum = 0;
+            for (AbstractClient abstractClient : clientThreads) {
+                sum += abstractClient.getResultTime();
+            }
+            testResult.resultTime = sum / clientThreads.size();
             testResult.packetLoss.fromClients = tunnelInterface.statistic.clients.getPacketLoss();
             testResult.packetLoss.fromServers = tunnelInterface.statistic.servers.getPacketLoss();
         }
-    }
-
-    public void clear() throws TestErrorException {
-        clientThreads.forEach(AbstractClient::clear);
-        clientThreads.clear();
-
-        super.clear();
+        return testResult;
     }
 
     protected abstract AbstractServer initServer(Configuration.Device device) throws TestErrorException;

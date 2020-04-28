@@ -91,6 +91,7 @@ int main()
 		}
 		else if (command == "send")
 		{
+		    request_counter = 0;
 			int amount;
 			uint32_t responce_size;
 			std::string file_name;
@@ -98,6 +99,7 @@ int main()
 
 			log() << "requesting " << responce_size / 1024 << " Kbytes " << amount << " times, file: " << file_name << std::endl;
 
+            auto request_start_time = std::chrono::high_resolution_clock::now();
 			for (int i = 0; i < amount; ++i)
 			{
 				//perform request
@@ -169,6 +171,9 @@ int main()
 				ut2_Request_free(request);
 				request_counter++;
 			}
+			auto request_finish_time = std::chrono::high_resolution_clock::now();
+			int result_time = std::chrono::duration_cast<std::chrono::milliseconds>(request_finish_time - request_start_time).count();
+			log() << amount << " requests for file " << responce_size / 1024 << " Kbytes completed in " << result_time << " ms" << std::endl;
 		}
 		else if (command == "cipher")
 		{

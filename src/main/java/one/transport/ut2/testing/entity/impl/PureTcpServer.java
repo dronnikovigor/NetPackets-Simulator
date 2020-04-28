@@ -49,9 +49,14 @@ public class PureTcpServer extends AbstractServer {
                         while (!PureTcpServer.this.isInterrupted() && socket.isConnected()) {
                             try {
                                 dis.readFully(buffer);
+                                String request = trimZeros(new String(buffer));
+                                try {
+                                    int fileSize = Integer.parseInt(request);
+                                    dos.write(filesData.get(fileSize));
+                                    dos.flush();
+                                } catch (NumberFormatException ignored) {
 
-                                dos.write(fileData);
-                                dos.flush();
+                                }
                             } catch (EOFException e) {
                                 //TODO fix exception
                             }
@@ -74,5 +79,10 @@ public class PureTcpServer extends AbstractServer {
     @Override
     public void clear() {
 
+    }
+
+    static String trimZeros(String str) {
+        int pos = str.indexOf(0);
+        return pos == -1 ? str : str.substring(0, pos);
     }
 }

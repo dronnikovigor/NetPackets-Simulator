@@ -23,8 +23,8 @@ public class PureTcpClient extends AbstractClient {
 
     private byte[] response;
 
-    public PureTcpClient(Configuration.Device clientConf, Configuration.Device serverConf, int id, Path logDir, int fileSize) throws TestErrorException {
-        super(id, logDir, fileSize);
+    public PureTcpClient(Configuration.Device clientConf, Configuration.Device serverConf, int id, Path logDir) throws TestErrorException {
+        super(id, logDir);
         Socket socket = new Socket();
         try {
             SocketAddress clientAddr =
@@ -56,14 +56,18 @@ public class PureTcpClient extends AbstractClient {
 
     @Override
     public void run() {
+        startTime = System.currentTimeMillis();
         for (int i = 0; i < reqAmount; ++i) {
             ByteArrayOutputStream req2 = new ByteArrayOutputStream();
-            req2.write(fileData, 0, 1024);
-
+            byte[] size = String.valueOf(fileSize).getBytes();
+            byte[] request = new byte[1024];
+            System.arraycopy(size, 0, request, 0, size.length);
             try {
+                req2.write(request);
+
                 req2.writeTo(os);
                 os.flush();
-                response = new byte[fileData.length];
+                response = new byte[fileSize*1024];
                 dis.readFully(response);
 
                 LOGGER.info("Progress: " + (i + 1) * 100 / reqAmount + "%");
@@ -71,6 +75,7 @@ public class PureTcpClient extends AbstractClient {
                 testResult = new TestResult("IOException while RW to stream: " + e);
             }
         }
+        finishTime = System.currentTimeMillis();
         testResult.success = true;
     }
 
@@ -80,6 +85,15 @@ public class PureTcpClient extends AbstractClient {
 
     @Override
     public boolean validateResponse() {
-        return Arrays.equals(response, fileData);
+        return Arrays.equals(response, filesData.get(fileSize));
+    }
+
+    @Override
+    public String getError() {
+        if (!testResult.success)
+            return "Exit by timeout";
+        if (!Arrays.equals(response, filesData.get(fileSize)))
+            return "Data are corrupted!";
+        return null;
     }
 }

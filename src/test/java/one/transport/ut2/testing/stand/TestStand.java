@@ -21,10 +21,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 import static one.transport.ut2.testing.ApplicationProperties.applicationProps;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -116,37 +113,41 @@ class TestStand {
         executeTest(new PureTcpDataTransferTestStand());
     }
 
+    @AfterEach
+    void standRelax() throws InterruptedException {
+        Thread.sleep(60_000);
+    }
+
     private void executeTest(AbstractTestStand test) throws Exception {
         LOGGER.info(test.getClass().getSimpleName() + " started");
-        TestResult testResult = null;
         int progress = 1;
         int totalProgress = configuration.rtts.length
                 * configuration.lossParams.length
                 * configuration.bandwidths.length
                 * configuration.speedRates.length
-                * configuration.congestionControlWindows.length
-                * configuration.fileSizes.length;
+                * configuration.congestionControlWindows.length;
         for (int rtt : configuration.rtts) {
             for (PacketLoss.LossParams lossParams : configuration.lossParams) {
                 for (int bandwidth : configuration.bandwidths) {
                     for (double speedRate : configuration.speedRates) {
                         for (int congestionControlWindow : configuration.congestionControlWindows) {
-                            for (int fileSize : configuration.fileSizes) {
-                                tunnelInterface.rtt = rtt;
-                                tunnelInterface.lossParams = lossParams;
-                                tunnelInterface.bandwidth = bandwidth;
-                                tunnelInterface.speedRate = speedRate;
-                                tunnelInterface.setCongestionControlWindowCapacity(congestionControlWindow);
-                                tunnelInterface.packetStat = test.packetStat;
-                                tunnelInterface.start();
+                            tunnelInterface.rtt = rtt;
+                            tunnelInterface.lossParams = lossParams;
+                            tunnelInterface.bandwidth = bandwidth;
+                            tunnelInterface.speedRate = speedRate;
+                            tunnelInterface.setCongestionControlWindowCapacity(congestionControlWindow);
+                            tunnelInterface.packetStat = test.packetStat;
+                            tunnelInterface.start();
 
-                                try {
-                                    LOGGER.info("Test case started: \n" +
-                                            "[FileSize = " + fileSize + "kb; Config = " + tunnelInterface + "]");
-                                    test.init(configuration, tunnelInterface);
-                                    testResult = test.runTest(fileSize);
-                                } catch (Exception e) {
-                                    testResult = new TestResult(
+                            List<TestResult> testResults = new ArrayList<>();
+                            try {
+                                LOGGER.info("Test case started: \n" +
+                                        "[Config = " + tunnelInterface + "]");
+                                test.init(configuration, tunnelInterface);
+                                testResults = test.runTest();
+                            } catch (Exception e) {
+                                for (int fileSize : configuration.fileSizes) {
+                                    testResults.add(new TestResult(
                                             e.getMessage() + "\n" + Arrays.toString(e.getStackTrace()),
                                             0,
                                             fileSize,
@@ -156,18 +157,21 @@ class TestStand {
                                             speedRate,
                                             congestionControlWindow,
                                             lossParams,
-                                            null);
-                                } finally {
-                                    allTestsResults.computeIfAbsent(test.getClass().getSimpleName(), k ->
-                                            new ArrayList<>()).add(testResult);
-                                    LOGGER.info("Test case finished with time " + testResult.resultTime + "ms, result: " + testResult.success);
-                                    LOGGER.info("Test progress: " + progress++ + " / " + totalProgress);
+                                            null));
+                                }
+                            } finally {
+                                allTestsResults.computeIfAbsent(test.getClass().getSimpleName(), k ->
+                                        new ArrayList<>()).addAll(testResults);
+                                testResults.forEach(testResult -> {
+                                    LOGGER.info("Test case for " + testResult.fileSize + "KB file finished with time " + testResult.resultTime + "ms, result: " + testResult.success);
                                     if (!testResult.success)
                                         LOGGER.error("Error: " + testResult.error);
-                                    test.clear();
-                                }
-                                tunnelInterface.stop();
+                                });
+
+                                LOGGER.info("Test progress: " + progress++ + " / " + totalProgress + "\n");
+                                test.clear();
                             }
+                            tunnelInterface.stop();
                         }
                     }
                 }

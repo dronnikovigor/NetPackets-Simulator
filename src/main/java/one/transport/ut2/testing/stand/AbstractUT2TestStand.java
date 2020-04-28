@@ -8,7 +8,7 @@ import one.transport.ut2.cluster.ClusterHostStatus;
 import one.transport.ut2.testing.cluster.ClusterHost2;
 import one.transport.ut2.testing.cluster.ClusterUtils;
 import one.transport.ut2.testing.entity.*;
-import one.transport.ut2.testing.entity.impl.UT2ClientSideImpl;
+import one.transport.ut2.testing.entity.impl.UT2ClientImpl;
 import one.transport.ut2.testing.entity.impl.UT2ServerSideImpl;
 import one.transport.ut2.testing.tunnel.TunnelInterface;
 import one.transport.ut2.testing.utils.IpUtils;
@@ -22,19 +22,23 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 
 import static one.transport.ut2.testing.ApplicationProperties.applicationProps;
 
 public abstract class AbstractUT2TestStand extends AbstractTestStand {
     private final static Logger LOGGER = LoggerFactory.getLogger(AbstractUT2TestStand.class);
-    protected UT2Mode ut2Mode;
-    private final List<UT2ClientSide> clientProcesses = new ArrayList<>();
+    private List<AbstractUT2Client> clientProcesses;
     private UT2ServerSide[] serverSides;
+    protected UT2Mode ut2Mode;
 
-    private volatile byte[] fileData;
+    private volatile Map<Integer, byte[]> filesData;
     private final Object syncObj = new Object();
+
+    private UT2ServerHandler requestsHandler;
 
     @Override
     public void init(Configuration configuration, TunnelInterface tunnelInterface) throws TestErrorException {
@@ -42,6 +46,7 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
 
         final Configuration.Device[] serversDevices = configuration.getServers();
         serverSides = new UT2ServerSideImpl[serversDevices.length];
+        clientProcesses = new ArrayList<>();
         for (int i = 0; i < serverSides.length; ++i) {
             Configuration.Device serverDevice = serversDevices[i];
             serverSides[i] = new UT2ServerSideImpl(Executors.newSingleThreadExecutor(), ut2Mode);
@@ -65,21 +70,13 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
             ClusterUtils.hosts.put(host, true);
         }
 
+        filesData = new HashMap<>();
         generateTestFiles(null);
     }
 
     @Override
-    public TestResult runTest(int fileSize) throws TestErrorException {
-        super.runTest(fileSize);
-
-        for (Configuration.Device clientDevice : configuration.getClients()) {
-            initClientProcess(clientDevice, configuration.getServers());
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
+    public List<TestResult> runTest() throws TestErrorException {
+        List<TestResult> testResults = super.runTest();
 
         UT2ServerSide ut2ServerSide = null;
         for (UT2ServerSide server : serverSides) {
@@ -92,12 +89,45 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
             throw new TestErrorException("UT2Server in null");
         }
 
-        UT2ServerHandler requestsHandler = new UT2ServerHandler();
-        ut2ServerSide.setServerHandler(requestsHandler);
+        for (Configuration.Device clientDevice : configuration.getClients()) {
+            initClientProcess(clientDevice, configuration.getServers());
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
 
+        for (int fileSize : configuration.fileSizes) {
+            requestsHandler = new UT2ServerHandler();
+            ut2ServerSide.setServerHandler(requestsHandler);
+
+            executeTest(fileSize);
+        }
+
+        for (int i = 0; i < configuration.getClients().length; i++) {
+            if (!clientProcesses.get(i).finishClientProcess(60_000))
+                throw new TestErrorException("Client terminated: " + getClientsErrors());
+        }
+
+        for (int fileSize : configuration.fileSizes) {
+            long sum = 0;
+            for (UT2Client clientProcess : clientProcesses) {
+                sum += clientProcess.getResultTime(fileSize);
+            }
+
+            testResults.add(setUpTestResult(fileSize, sum));
+        }
+
+        clientProcesses.forEach(AbstractUT2Client::clear);
+        clientProcesses.clear();
+
+        return testResults;
+    }
+
+    private void executeTest(int fileSize) throws TestErrorException {
         List<Thread> responseThreads = new ArrayList<>();
 
-        final long startTime = System.currentTimeMillis();
         for (int i = 0; i < configuration.getClients().length; i++) {
             clientProcesses.get(i).sendCommand(ClientInterface.sendCommand(configuration.reqAmount,
                     fileSize * 1024, Paths.get(applicationProps.getProperty("temp.data.folder") + "/" + fileSize + "KB")));
@@ -126,27 +156,27 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
                 e.printStackTrace();
             }
         }
+    }
 
-        final long finishTime = System.currentTimeMillis();
-
-        for (int i = 0; i < configuration.getClients().length; i++) {
-            if (!clientProcesses.get(i).finishClientProcess(60_000))
-                throw new TestErrorException("Client terminated: " + getClientsErrors());
-        }
+    private TestResult setUpTestResult(int fileSize, long time) {
+        TestResult testResult = new TestResult();
+        testResult.rtt = tunnelInterface.rtt;
+        testResult.fileSize = fileSize;
+        testResult.requests = configuration.reqAmount;
+        testResult.lossParams = tunnelInterface.lossParams;
+        testResult.bandwidth = tunnelInterface.bandwidth;
+        testResult.speedRate = tunnelInterface.speedRate;
+        testResult.congestionControlWindow = tunnelInterface.getCongestionControlWindowCapacity();
 
         testResult.success = true;
-        testResult.resultTime = finishTime - startTime;
+        testResult.resultTime = time / clientProcesses.size();
         testResult.packetLoss.fromClients = tunnelInterface.statistic.clients.getPacketLoss();
         testResult.packetLoss.fromServers = tunnelInterface.statistic.servers.getPacketLoss();
-
         return testResult;
     }
 
     @Override
     public void clear() throws TestErrorException {
-        clientProcesses.forEach(UT2ClientSide::clear);
-        clientProcesses.clear();
-
         super.clear();
 
         for (UT2ServerSide UT2ServerSide : serverSides) {
@@ -162,7 +192,8 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
 
     @Override
     protected void createFile(String path, int size, String serverAddress) throws TestErrorException {
-        fileData = new byte[size * 1024];
+        byte[] fileData = new byte[size * 1024];
+        filesData.put(size * 1024, fileData);
         File file = new File(path);
         try (FileWriter fileWriter = new FileWriter(file, false);
              BufferedWriter bufferedWriter = new BufferedWriter(fileWriter)) {
@@ -173,14 +204,14 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
     }
 
     private void initClientProcess(Configuration.Device clientDevice, Configuration.Device... serverDevices) throws TestErrorException {
-        final UT2ClientSide clientProcess = new UT2ClientSideImpl(clientProcesses.size(), logDir, ut2Mode, clientDevice, serverDevices);
+        final AbstractUT2Client clientProcess = new UT2ClientImpl(clientProcesses.size(), logDir, ut2Mode, clientDevice, serverDevices);
         clientProcess.start();
         clientProcesses.add(clientProcess);
     }
 
     private String getClientsErrors() throws TestErrorException {
         StringBuilder result = new StringBuilder();
-        for (UT2ClientSide clientProcess : clientProcesses) {
+        for (AbstractUT2Client clientProcess : clientProcesses) {
             String clientProcessError = clientProcess.getError();
             if (!clientProcessError.isEmpty())
                 result.append(clientProcessError).append("\n");
@@ -201,12 +232,12 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
                     //todo don't change bytes order in client
 //                    buffer.order(ByteOrder.LITTLE_ENDIAN);
                     int responseSize = buffer.getInt();
-                    wrongRequestedFileSize = responseSize != fileData.length;
+                    wrongRequestedFileSize = filesData.containsKey(responseSize);
                     lastRequestId = buffer.getInt();
                     synchronized (syncObj) {
                         syncObj.notifyAll();
                     }
-                    ut2PipeOutput.writeChunk(fileData);
+                    ut2PipeOutput.writeChunk(filesData.get(responseSize));
                 }
 
                 @Override
