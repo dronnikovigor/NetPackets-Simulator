@@ -15,16 +15,11 @@ import one.transport.ut2.testing.utils.IpUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Executors;
 
 import static one.transport.ut2.testing.ApplicationProperties.applicationProps;
@@ -36,6 +31,7 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
     protected UT2Mode ut2Mode;
 
     private volatile Map<Integer, byte[]> filesData;
+    private final Random rnd = new Random();
     private final Object syncObj = new Object();
 
     private UT2ServerHandler requestsHandler;
@@ -111,12 +107,22 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
         }
 
         for (int fileSize : configuration.fileSizes) {
-            long sum = 0;
+            boolean validated = true;
             for (UT2Client clientProcess : clientProcesses) {
-                sum += clientProcess.getResultTime(fileSize);
+                if (!clientProcess.validateResponse(fileSize)) {
+                    validated = false;
+                    break;
+                }
             }
+            if (validated) {
+                long sum = 0;
+                for (UT2Client clientProcess : clientProcesses) {
+                    sum += clientProcess.getResultTime(fileSize);
+                }
 
-            testResults.add(setUpTestResult(fileSize, sum));
+                testResults.add(setUpTestResult(fileSize, validated, sum));
+            } else
+                testResults.add(setUpTestResult(fileSize, validated, 0));
         }
 
         clientProcesses.forEach(AbstractUT2Client::clear);
@@ -158,7 +164,7 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
         }
     }
 
-    private TestResult setUpTestResult(int fileSize, long time) {
+    private TestResult setUpTestResult(int fileSize, boolean success, long time) {
         TestResult testResult = new TestResult();
         testResult.rtt = tunnelInterface.rtt;
         testResult.fileSize = fileSize;
@@ -168,7 +174,7 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
         testResult.speedRate = tunnelInterface.speedRate;
         testResult.congestionControlWindow = tunnelInterface.getCongestionControlWindowCapacity();
 
-        testResult.success = true;
+        testResult.success = success;
         testResult.resultTime = time / clientProcesses.size();
         testResult.packetLoss.fromClients = tunnelInterface.statistic.clients.getPacketLoss();
         testResult.packetLoss.fromServers = tunnelInterface.statistic.servers.getPacketLoss();
@@ -193,11 +199,14 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
     @Override
     protected void createFile(String path, int size, String serverAddress) throws TestErrorException {
         byte[] fileData = new byte[size * 1024];
+        rnd.nextBytes(fileData);
         filesData.put(size * 1024, fileData);
-        File file = new File(path);
-        try (FileWriter fileWriter = new FileWriter(file, false);
-             BufferedWriter bufferedWriter = new BufferedWriter(fileWriter)) {
-            bufferedWriter.write(new String(fileData));
+
+        try {
+            Files.createFile(Paths.get(path));
+            FileOutputStream fileOutputStream = new FileOutputStream(new File(path));
+            fileOutputStream.write(fileData);
+            fileOutputStream.close();
         } catch (IOException e) {
             throw new TestErrorException("Error while generating files: " + e);
         }

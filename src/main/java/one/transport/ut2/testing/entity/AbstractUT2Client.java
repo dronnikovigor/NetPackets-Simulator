@@ -68,7 +68,7 @@ public abstract class AbstractUT2Client implements UT2Client, CommonClient {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        return finished && process.exitValue() == 0;
+        return finished /*&& process.exitValue() == 0*/;
     }
 
     @Override
@@ -127,6 +127,7 @@ public abstract class AbstractUT2Client implements UT2Client, CommonClient {
             while ((line = bufferedReader.readLine()) != null)
                 if (line.contains("requests for file "+ fileSize +" Kbytes completed in")) {
                     String[] lineByWord = line.split(" ");
+                    int success_requests = Integer.parseInt(lineByWord[13]);
                     return (long) Double.parseDouble(lineByWord[10]);
                 }
         } catch (IOException | NumberFormatException e) {
@@ -134,5 +135,25 @@ public abstract class AbstractUT2Client implements UT2Client, CommonClient {
         }
 
         return -1;
+    }
+
+    @Override
+    public boolean validateResponse(int fileSize) throws TestErrorException {
+        try (FileInputStream fileInputStream = new FileInputStream(outFile.toFile());
+             InputStreamReader inputStreamReader = new InputStreamReader(fileInputStream);
+             BufferedReader bufferedReader = new BufferedReader(inputStreamReader)) {
+            String line;
+            while ((line = bufferedReader.readLine()) != null)
+                if (line.contains("requests for file "+ fileSize +" Kbytes completed in")) {
+                    String[] lineByWord = line.split(" ");
+                    int total_requests = Integer.parseInt(lineByWord[2]);
+                    int success_requests = Integer.parseInt(lineByWord[13]);
+                    return success_requests == total_requests;
+                }
+        } catch (IOException | NumberFormatException e) {
+            throw new TestErrorException("Error while reading client output: " + e);
+        }
+
+        return false;
     }
 }

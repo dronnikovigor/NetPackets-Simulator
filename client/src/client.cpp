@@ -82,6 +82,7 @@ int main()
 	std::string command;
 	int return_code = 0;
 	unsigned int request_counter = 0;
+	unsigned int success_requests = 0;
 	while (std::cin >> command)
 	{
 		log() << "received command: " << command << std::endl;
@@ -92,6 +93,7 @@ int main()
 		else if (command == "send")
 		{
 		    request_counter = 0;
+		    success_requests = 0;
 			int amount;
 			uint32_t responce_size;
 			std::string file_name;
@@ -164,6 +166,7 @@ int main()
 					}
 					else
 					{
+					    success_requests++;
 						log() << request_counter << " request, successfully received " << (readed / 1024) << " Kbytes" << std::endl;
 					}
 				}
@@ -173,7 +176,7 @@ int main()
 			}
 			auto request_finish_time = std::chrono::high_resolution_clock::now();
 			int result_time = std::chrono::duration_cast<std::chrono::milliseconds>(request_finish_time - request_start_time).count();
-			log() << amount << " requests for file " << responce_size / 1024 << " Kbytes completed in " << result_time << " ms" << std::endl;
+			log() << amount << " requests for file " << responce_size / 1024 << " Kbytes completed in " << result_time << " ms, successful: " << success_requests << std::endl;
 		}
 		else if (command == "cipher")
 		{

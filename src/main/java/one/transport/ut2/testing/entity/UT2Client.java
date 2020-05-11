@@ -13,4 +13,6 @@ public interface UT2Client {
     boolean finishClientProcess(long millis) throws TestErrorException;
 
     long getResultTime(int fileSize) throws TestErrorException;
+
+    boolean validateResponse(int fileSize) throws TestErrorException;
 }
