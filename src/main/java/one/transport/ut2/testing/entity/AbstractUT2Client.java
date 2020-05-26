@@ -17,15 +17,16 @@ public abstract class AbstractUT2Client implements UT2Client, CommonClient {
     private OutputStreamWriter stdIn;
     private final Path errFile;
     private final Path outFile;
-
+    private final int id;
 
     public AbstractUT2Client(int id, Path logDir, UT2Mode ut2Mode, Configuration.Device clientDevice, Configuration.Device... serverDevices) throws TestErrorException {
+        this.id = id;
         Path clientDir = Paths.get("").resolve(applicationProps.getProperty("ut2.client.dir"));
         Path clientConfigurationDir = Paths.get(clientDir + applicationProps.getProperty("ut2.client.configuration"));
         Configuration.writeClientConfiguration(ut2Mode, clientConfigurationDir, clientDevice, serverDevices);
 
-        errFile = logDir.resolve(String.format(ERROR_NAME, id + 1));
-        outFile = logDir.resolve(String.format(OUTPUT_NAME, id + 1));
+        errFile = logDir.resolve(String.format(ERROR_NAME, getClientId()));
+        outFile = logDir.resolve(String.format(OUTPUT_NAME, getClientId()));
 
         try {
             Files.createFile(errFile);
@@ -119,6 +120,11 @@ public abstract class AbstractUT2Client implements UT2Client, CommonClient {
     }
 
     @Override
+    public int getClientId() {
+        return id + 1;
+    }
+
+    @Override
     public long getResultTime(int fileSize) throws TestErrorException {
         try (FileInputStream fileInputStream = new FileInputStream(outFile.toFile());
              InputStreamReader inputStreamReader = new InputStreamReader(fileInputStream);
@@ -127,7 +133,6 @@ public abstract class AbstractUT2Client implements UT2Client, CommonClient {
             while ((line = bufferedReader.readLine()) != null)
                 if (line.contains("requests for file "+ fileSize +" Kbytes completed in")) {
                     String[] lineByWord = line.split(" ");
-                    int success_requests = Integer.parseInt(lineByWord[13]);
                     return (long) Double.parseDouble(lineByWord[10]);
                 }
         } catch (IOException | NumberFormatException e) {

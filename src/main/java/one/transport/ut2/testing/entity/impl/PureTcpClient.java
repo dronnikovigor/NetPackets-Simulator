@@ -70,7 +70,7 @@ public class PureTcpClient extends AbstractClient {
                 response = new byte[fileSize*1024];
                 dis.readFully(response);
 
-                LOGGER.info("Progress: " + (i + 1) * 100 / reqAmount + "%");
+                LOGGER.info("FileSize: " + fileSize + "KB; Client id: " + getClientId() +"; Progress: " + (i + 1) * 100 / reqAmount + "%");
             } catch (IOException e) {
                 testResult = new TestResult("IOException while RW to stream: " + e);
             }

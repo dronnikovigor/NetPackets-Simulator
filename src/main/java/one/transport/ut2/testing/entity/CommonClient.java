@@ -5,4 +5,6 @@ public interface CommonClient {
     void clear();
 
     String getError() throws TestErrorException;
+
+    int getClientId();
 }

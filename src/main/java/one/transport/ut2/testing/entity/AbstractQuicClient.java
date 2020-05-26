@@ -24,8 +24,8 @@ public abstract class AbstractQuicClient extends AbstractClient {
         for (int i = 0; i < reqAmount; ++i) {
             try {
                 ;
-                Path clientErrFile = logDir.resolve(String.format(errorName, fileSize, id + 1, i + 1));
-                Path clientOutFile = logDir.resolve(String.format(outputName, fileSize, id + 1, i + 1));
+                Path clientErrFile = logDir.resolve(String.format(errorName, fileSize, getClientId(), i + 1));
+                Path clientOutFile = logDir.resolve(String.format(outputName, fileSize, getClientId(), i + 1));
                 processBuilder.redirectError(clientErrFile.toFile());
                 processBuilder.redirectOutput(clientOutFile.toFile());
                 process = processBuilder.start();
@@ -36,7 +36,7 @@ public abstract class AbstractQuicClient extends AbstractClient {
 
             try {
                 process.waitFor(900_000, TimeUnit.MILLISECONDS);
-                LOGGER.info("FileSize: " + fileSize + "KB; Client id: " + (id + 1) + "; Progress: " + (i + 1) * 100 / reqAmount + "%");
+                LOGGER.info("FileSize: " + fileSize + "KB; Client id: " + getClientId() + "; Progress: " + (i + 1) * 100 / reqAmount + "%");
             } catch (InterruptedException e) {
                 testResult = new TestResult("Client was terminated by timeout: " + e);
                 return;
@@ -57,7 +57,7 @@ public abstract class AbstractQuicClient extends AbstractClient {
         boolean[] results = new boolean[reqAmount];
 
         for (int i = 0; i < reqAmount; ++i) {
-            Path clientOutFile = logDir.resolve(String.format(outputName, fileSize, id + 1, i + 1));
+            Path clientOutFile = logDir.resolve(String.format(outputName, fileSize, getClientId(), i + 1));
             File file = new File(String.valueOf(clientOutFile));
             try (BufferedReader bufferedReader = new BufferedReader(new FileReader(file))) {
                 String line;
@@ -75,8 +75,8 @@ public abstract class AbstractQuicClient extends AbstractClient {
     public String getError() throws TestErrorException {
         StringBuilder result = new StringBuilder();
         for (int i = 0; i < reqAmount; ++i) {
-            result.append("Client id: ").append(id + 1).append(" Request: ").append(i + 1).append("\n");
-            Path clientErrFile = logDir.resolve(String.format(errorName, fileSize, id + 1, i + 1));
+            result.append("Client id: ").append(getClientId()).append(" Request: ").append(i + 1).append("\n");
+            Path clientErrFile = logDir.resolve(String.format(errorName, fileSize, getClientId(), i + 1));
             File file = new File(String.valueOf(clientErrFile));
             try (BufferedReader bufferedReader = new BufferedReader(new FileReader(file))) {
                 String line;

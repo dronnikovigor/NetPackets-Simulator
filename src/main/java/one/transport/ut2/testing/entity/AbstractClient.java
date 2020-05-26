@@ -55,5 +55,8 @@ public abstract class AbstractClient extends Thread implements CommonClient, Sin
     @Override
     abstract public boolean validateResponse() throws TestErrorException;
 
-
+    @Override
+    public int getClientId() {
+        return id + 1;
+    }
 }

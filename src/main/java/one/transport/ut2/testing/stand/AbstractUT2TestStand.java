@@ -157,7 +157,7 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
             Thread responseThread = responseThreads.get(i);
             try {
                 responseThread.join(60_000);
-                LOGGER.info("Progress: " + (i + 1) * 100 / responseThreads.size() + "%");
+                LOGGER.info("FileSize: " + fileSize + "KB; Progress: " + (i + 1) * 100 / responseThreads.size() + "%");
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

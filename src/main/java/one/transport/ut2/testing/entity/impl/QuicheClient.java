@@ -66,7 +66,7 @@ public class QuicheClient extends AbstractQuicClient {
                         if (line != null) {
                             if (line.contains("connection closed")) {
                                 testResult.success = true;
-                                LOGGER.info("FileSize: " + fileSize + "KB; Client id: " + (id + 1) + "; Progress: 100%");
+                                LOGGER.info("FileSize: " + fileSize + "KB; Client id: " + getClientId() + "; Progress: 100%");
                                 break;
                             }
                         }
@@ -114,7 +114,7 @@ public class QuicheClient extends AbstractQuicClient {
     @Override
     public String getError() throws TestErrorException {
         StringBuilder result = new StringBuilder();
-        result.append("Client id: ").append(id + 1).append("\n");
+        result.append("Client id: ").append(getClientId()).append("\n");
         try (FileInputStream fileInputStream = new FileInputStream(outputFile.toFile());
              InputStreamReader inputStreamReader = new InputStreamReader(fileInputStream);
              BufferedReader bufferedReader = new BufferedReader(inputStreamReader)) {
