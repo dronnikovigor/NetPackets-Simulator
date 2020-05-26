@@ -1,10 +1,10 @@
-This is network packet simulator for emulating various network types in order to test the behavior of the UT2, TCP, QUIC protocols.
+This is network packet simulator for emulating various network types in order to test the behavior of the UT2, TCP, QUIC, QUICHE protocols.
 
 ### Functionality
-This network packet simulator support such features as:
+This network packet simulator supports such features as:
 * RTT
 * Bandwidth limiting
-* Separate limits for upload/download channels 
+* Separate rates for upload/download channels 
 * Setting amount of file sizes
 * Setting amount of requests
 * Ability to test different combinations of loss 
@@ -20,8 +20,8 @@ This network packet simulator support such features as:
 ##### Optionally
 * `valgrid` - for checking memory leaks
 * `tshark` - for dumping packets (NB: https://gist.github.com/MinaMikhailcom/0825906230cbbe478faf4d08abe9d11a)
-* built QUIC from Chromium sources for QUIC tests (check for it: https://www.chromium.org/quic/playing-with-quic)
-    Also, before starting QUIC tests it's needed to generate certificates and add them to CA store.
+* built QUIC from Chromium sources for QUIC tests (check for it: https://www.chromium.org/quic/playing-with-quic).
+Before starting QUIC tests it's needed to generate certificates and add them to CA store.
     1. Run:
         ```
         ${PATH_TO_CHROMIUM}/src/net/tools/quic/generate-certs.sh
@@ -35,7 +35,7 @@ This network packet simulator support such features as:
        sudo bash add-certs-to-stores.sh ${PATH_TO_CHROMIUM}/src/net/tools/quic/certs/out/2048-sha256-root.pem "QUIC Server Root CA"
         ``` 
        
-    Next times it can be set up using (remember to configure paths in script:
+    Next times it could be set up using script (remember to configure paths in the script):
     ```
     ./set_up_quic.sh
     ```
@@ -54,7 +54,7 @@ This network packet simulator support such features as:
     ```
     ./gradlew cleanTest test --tests "one.transport.ut2.testing.stand.TestStand" --info
     ```
-    To run concrete tests use this commands:  
+    To run certain tests use this commands:  
     * TCP:
     ```
     ./gradlew cleanTest test --tests "one.transport.ut2.testing.stand.TestStand.PureTcpDataTransferTest" --info
@@ -83,7 +83,7 @@ This network packet simulator support such features as:
 ### Configuration
 There are two files for configuring tests:
 * `application.properties`  
-    This file contains variables for environment. It's needed to change variables related to QUIC before running QUIC tests.
+    This file contains variables for environment. It's needed to change variables related to QUIC/QUICHE before running QUIC/QUICHE tests.
 * `configuration.json`  
     This file contains parameters for setting up test cases.
 
