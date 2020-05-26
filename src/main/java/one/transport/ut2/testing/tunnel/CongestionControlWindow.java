@@ -12,6 +12,8 @@ public interface CongestionControlWindow {
 
     void setCapacity(int newCapacity);
 
+    int getCapacity();
+
     class Statistic {
         private int totalPackets = 0;
         private int droppedPackets = 0;

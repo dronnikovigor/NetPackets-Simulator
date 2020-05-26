@@ -1,54 +1,68 @@
 package one.transport.ut2.testing.stand;
 
-import one.transport.ut2.testing.entity.TestContext;
+import one.transport.ut2.testing.entity.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
-abstract class AbstractCommonFileSendingTestStand extends AbstractTestStand {
+public abstract class AbstractCommonFileSendingTestStand extends AbstractTestStand {
 
-    List<AbstractClientThread> clientThreads = new ArrayList<>();
+    protected final List<AbstractClient> clientThreads = new ArrayList<>();
+    protected AbstractServer serverThread;
 
-    protected TestContext.TestResult runTest() {
-        final long startTime = System.currentTimeMillis();
+    protected TestResult executeTest(int fileSize) throws TestErrorException {
         clientThreads.forEach(Thread::start);
-        clientThreads.forEach(clientThread -> {
+        for (AbstractClient clientThread : clientThreads) {
             try {
-                clientThread.join();
+                clientThread.join(300_000);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                throw new TestErrorException("Error while join of client: " + e);
             }
-        });
-        final long finishTime = System.currentTimeMillis();
+        }
 
-        testResult.resultTime = finishTime - startTime;
-        testResult.success = clientThreads.stream().allMatch(clientThread -> clientThread.testResult == null);
+        TestResult testResult = setUpTestResult(fileSize);
+
+        clientThreads.forEach(AbstractClient::clear);
+        clientThreads.clear();
+        return testResult;
+    }
+
+    private TestResult setUpTestResult(int fileSize) throws TestErrorException {
+        TestResult testResult = new TestResult();
+        testResult.fileSize = fileSize;
+        testResult.rtt = tunnelInterface.rtt;
+        testResult.requests = configuration.reqAmount;
+        testResult.lossParams = tunnelInterface.lossParams;
+        testResult.bandwidth = tunnelInterface.bandwidth;
+        testResult.speedRate = tunnelInterface.speedRate;
+        testResult.congestionControlWindow = tunnelInterface.getCongestionControlWindowCapacity();
+
+        testResult.success = clientThreads.stream().allMatch(clientThread -> clientThread.getTestResult().success)
+                && serverThread.getTestResult().success;
+        for (AbstractClient abstractClient : clientThreads) {
+            testResult.success = testResult.success && abstractClient.validateResponse();
+        }
         if (!testResult.success) {
             StringBuilder error = new StringBuilder();
-            clientThreads.forEach(clientThread -> {
-                if (clientThread.testResult.error != null)
-                    error.append(clientThread.testResult.error).append(" ");
-            });
+            for (AbstractClient abstractClient : clientThreads) {
+                if (abstractClient.getTestResult().error != null)
+                    error.append(abstractClient.getTestResult().error).append(" ");
+                error.append(abstractClient.getError());
+            }
             testResult.error = error.toString();
         } else {
-            testResult.packetLoss.fromClients = testContext.tunnelInterface.statistic.clients.getPacketLoss();
-            testResult.packetLoss.fromServers = testContext.tunnelInterface.statistic.servers.getPacketLoss();
+            long sum = 0;
+            for (AbstractClient abstractClient : clientThreads) {
+                sum += abstractClient.getResultTime();
+            }
+            testResult.resultTime = sum / clientThreads.size();
+            testResult.packetLoss.fromClients = tunnelInterface.statistic.clients.getPacketLoss();
+            testResult.packetLoss.fromServers = tunnelInterface.statistic.servers.getPacketLoss();
         }
         return testResult;
     }
 
-    public void clear() {
-        clientThreads.forEach(AbstractClientThread::clear);
-        clientThreads.clear();
+    protected abstract AbstractServer initServer(Configuration.Device device) throws TestErrorException;
 
-        super.clear();
-    }
-
-    abstract class AbstractClientThread extends Thread {
-
-        TestContext.TestResult testResult;
-
-        abstract void clear();
-
-    }
+    protected abstract AbstractClient initClient(Configuration.Device clientDevice, Configuration.Device serverDevice) throws TestErrorException;
 }

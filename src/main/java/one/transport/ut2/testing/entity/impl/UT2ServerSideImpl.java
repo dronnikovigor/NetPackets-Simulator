@@ -5,7 +5,8 @@ import one.transport.ut2.ntv.UT2Server;
 import one.transport.ut2.ntv.UT2ServerArgs;
 import one.transport.ut2.ntv.UT2ZeroServer;
 import one.transport.ut2.testing.entity.Configuration;
-import one.transport.ut2.testing.entity.ServerSide;
+import one.transport.ut2.testing.entity.TestErrorException;
+import one.transport.ut2.testing.entity.UT2ServerSide;
 import one.transport.ut2.testing.entity.UT2Mode;
 import one.transport.ut2.testing.handler.OptClusterHandler;
 import one.transport.ut2.testing.handler.UTRpcAInfo;
@@ -15,32 +16,36 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.concurrent.Executor;
 
-public class UT2ServerSide implements ServerSide {
+public class UT2ServerSideImpl implements UT2ServerSide {
     private final Executor executor;
-    public byte instanceId;
+    private final UT2Mode ut2Mode;
+
+    private byte instanceId;
+
     private UT2Server server;
     private UT2ServerHandler handler;
     private OptClusterHandler clusterHandler;
-    private final UT2Mode ut2Mode;
 
-    public UT2ServerSide(Executor executor, UT2Mode ut2Mode) {
+    public UT2ServerSideImpl(Executor executor, UT2Mode ut2Mode) {
         this.executor = executor;
         this.ut2Mode = ut2Mode;
     }
 
+    @Override
     public void setServerHandler(UT2Pipe2Handler serverHandler) {
         UT2ZeroServer zeroServer = new UT2ZeroServer();
         handler.setPipeHandler(new SecureUT2PipeHandler(zeroServer)
                 .addHandler("handler", serverHandler));
     }
 
+    @Override
     public void setServerHandler(UT2ZeroServer zeroServer, UT2Pipe2Handler serverHandler) {
         handler.setPipeHandler(new SecureUT2PipeHandler(zeroServer)
                 .addHandler("handler", serverHandler));
     }
 
     @Override
-    public void initServer(@NotNull Configuration.Device serverDevice) {
+    public void initServer(@NotNull Configuration.Device serverDevice) throws TestErrorException {
         instanceId = serverDevice.getHostAddr();
 
         server = new UT2Server();
@@ -55,9 +60,7 @@ public class UT2ServerSide implements ServerSide {
             try {
                 serverArgs.udp.bindAddr.setHost(InetAddress.getByAddress(serverDevice.getIpBytes()));
             } catch (UnknownHostException e) {
-                e.printStackTrace();
-                //fixme
-                System.exit(1);
+                throw new TestErrorException("Unknown host: " + e);
             }
             serverArgs.udp.bindAddr.setPort(serverDevice.udpPort);
             serverArgs.udp.sender.concurrency = 1;
@@ -70,9 +73,7 @@ public class UT2ServerSide implements ServerSide {
             try {
                 serverArgs.tcp.binding.bindAddr.setHost(InetAddress.getByAddress(serverDevice.getIpBytes()));
             } catch (UnknownHostException e) {
-                e.printStackTrace();
-                //fixme
-                System.exit(1);
+                throw new TestErrorException("Unknown host: " + e);
             }
             serverArgs.tcp.binding.bindAddr.setPort(serverDevice.tcpPort);
         }
@@ -100,6 +101,11 @@ public class UT2ServerSide implements ServerSide {
             serverDevice.udpPort = getBindUdpPort();
         else
             serverDevice.tcpPort = getBindTcpPort();
+    }
+
+    @Override
+    public byte getInstanceId() {
+        return instanceId;
     }
 
     @Override

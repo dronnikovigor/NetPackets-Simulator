@@ -1,37 +1,52 @@
 package one.transport.ut2.testing.stand;
 
+import one.transport.ut2.UT2PeerCtx;
+import one.transport.ut2.UT2Pipe2Handler;
+import one.transport.ut2.UT2PipeInput;
+import one.transport.ut2.UT2PipeOutput;
 import one.transport.ut2.cluster.ClusterHostStatus;
 import one.transport.ut2.testing.cluster.ClusterHost2;
 import one.transport.ut2.testing.cluster.ClusterUtils;
 import one.transport.ut2.testing.entity.*;
-import one.transport.ut2.testing.entity.impl.UT2ServerSide;
+import one.transport.ut2.testing.entity.impl.UT2ClientImpl;
+import one.transport.ut2.testing.entity.impl.UT2ServerSideImpl;
 import one.transport.ut2.testing.tunnel.TunnelInterface;
 import one.transport.ut2.testing.utils.IpUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.OutputStreamWriter;
+import java.io.*;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import static one.transport.ut2.testing.ApplicationProperties.applicationProps;
 
 public abstract class AbstractUT2TestStand extends AbstractTestStand {
-    UT2Mode ut2Mode;
-    private List<ClientProcess> clientProcesses = new ArrayList<>();
+    private final static Logger LOGGER = LoggerFactory.getLogger(AbstractUT2TestStand.class);
+    private List<AbstractUT2Client> clientProcesses;
+    private UT2ServerSide[] serverSides;
+    protected UT2Mode ut2Mode;
+
+    private volatile Map<Integer, byte[]> filesData;
+    private final Random rnd = new Random();
+    private final Object syncObj = new Object();
+
+    private UT2ServerHandler requestsHandler;
 
     @Override
-    public void init(Configuration configuration, TunnelInterface tunnelInterface) {
+    public void init(Configuration configuration, TunnelInterface tunnelInterface) throws TestErrorException {
+        super.init(configuration, tunnelInterface);
+
         final Configuration.Device[] serversDevices = configuration.getServers();
-        UT2ServerSide[] ut2ServerSides = new UT2ServerSide[serversDevices.length];
-        for (int i = 0; i < ut2ServerSides.length; ++i) {
+        serverSides = new UT2ServerSideImpl[serversDevices.length];
+        clientProcesses = new ArrayList<>();
+        for (int i = 0; i < serverSides.length; ++i) {
             Configuration.Device serverDevice = serversDevices[i];
-            ut2ServerSides[i] = new UT2ServerSide(Executors.newSingleThreadExecutor(), ut2Mode);
-            ut2ServerSides[i].initServer(serverDevice);
+            serverSides[i] = new UT2ServerSideImpl(Executors.newSingleThreadExecutor(), ut2Mode);
+            serverSides[i].initServer(serverDevice);
 
             ClusterHost2.Builder builder = new ClusterHost2.Builder();
             /* set all ip with client net addr */
@@ -42,63 +57,138 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
             /* */
             builder.instanceId = 0xFF & serverDevice.getHostAddr();
             if (ut2Mode == UT2Mode.UDP)
-                builder.udpPort = ut2ServerSides[i].getBindUdpPort();
+                builder.udpPort = serverSides[i].getBindUdpPort();
             else
-                builder.tcpPort = ut2ServerSides[i].getBindTcpPort();
+                builder.tcpPort = serverSides[i].getBindTcpPort();
             builder.status = ClusterHostStatus.running;
             /* */
             ClusterHost2 host = new ClusterHost2(builder);
             ClusterUtils.hosts.put(host, true);
         }
 
-        Path clientDir = Paths.get("").resolve(applicationProps.getProperty("ut2.client.dir"));
-        Path clientConfigurationDir = Paths.get(clientDir + applicationProps.getProperty("ut2.client.configuration"));
-
-        this.testContext = new TestContext(
-                configuration,
-                clientDir,
-                clientConfigurationDir,
-                ut2ServerSides,
-                tunnelInterface,
-                new ArrayList<>());
-    }
-
-    void initClientProcess() throws IOException {
-        Path errFile = logDir.resolve("error_" + (clientProcesses.size() + 1) + ".txt");
-        Path outFile = logDir.resolve("output_" + (clientProcesses.size() + 1) + ".txt");
-
-        Files.createFile(errFile);
-        Files.createFile(outFile);
-
-        final ClientProcess clientProcess = new ClientProcess();
-        clientProcess.process = new ProcessBuilder()
-                .directory(testContext.clientDir.toFile())
-                //.command("/bin/bash", "-c", "valgrind --log-file=\"" + logDir.toAbsolutePath().toString() + "/valgrind_report.txt\" ./build/client")
-                //todo add possibility to run without valgrind
-                .command("/bin/bash", "-c", "./build/client")
-                .redirectError(errFile.toFile())
-                .redirectOutput(outFile.toFile())
-                .start();
-        clientProcess.stdIn = new OutputStreamWriter(clientProcess.process.getOutputStream());
-
-        clientProcesses.add(clientProcess);
+        filesData = new HashMap<>();
+        generateTestFiles(null);
     }
 
     @Override
-    public void clear() {
-        clientProcesses.forEach(clientProcess -> {
-            if (clientProcess.process != null) {
-                clientProcess.process.destroy();
+    public List<TestResult> runTest() throws TestErrorException {
+        List<TestResult> testResults = super.runTest();
+
+        UT2ServerSide ut2ServerSide = null;
+        for (UT2ServerSide server : serverSides) {
+            if (server.getInstanceId() == serverId) {
+                ut2ServerSide = server;
+                break;
             }
-        });
+        }
+        if (ut2ServerSide == null) {
+            throw new TestErrorException("UT2Server in null");
+        }
+
+        for (Configuration.Device clientDevice : configuration.getClients()) {
+            initClientProcess(clientDevice, configuration.getServers());
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        for (int fileSize : configuration.fileSizes) {
+            requestsHandler = new UT2ServerHandler();
+            ut2ServerSide.setServerHandler(requestsHandler);
+
+            executeTest(fileSize);
+        }
+
+        for (int i = 0; i < configuration.getClients().length; i++) {
+            if (!clientProcesses.get(i).finishClientProcess(60_000))
+                throw new TestErrorException("Client terminated: " + getClientsErrors());
+        }
+
+        for (int fileSize : configuration.fileSizes) {
+            boolean validated = true;
+            for (UT2Client clientProcess : clientProcesses) {
+                if (!clientProcess.validateResponse(fileSize)) {
+                    validated = false;
+                    break;
+                }
+            }
+            if (validated) {
+                long sum = 0;
+                for (UT2Client clientProcess : clientProcesses) {
+                    sum += clientProcess.getResultTime(fileSize);
+                }
+
+                testResults.add(setUpTestResult(fileSize, validated, sum));
+            } else
+                testResults.add(setUpTestResult(fileSize, validated, 0));
+        }
+
+        clientProcesses.forEach(AbstractUT2Client::clear);
         clientProcesses.clear();
 
+        return testResults;
+    }
+
+    private void executeTest(int fileSize) throws TestErrorException {
+        List<Thread> responseThreads = new ArrayList<>();
+
+        for (int i = 0; i < configuration.getClients().length; i++) {
+            clientProcesses.get(i).sendCommand(ClientInterface.sendCommand(configuration.reqAmount,
+                    fileSize * 1024, Paths.get(applicationProps.getProperty("temp.data.folder") + "/" + fileSize + "KB")));
+
+            Thread responseThread = new Thread(() -> {
+                while (requestsHandler.lastRequestId != configuration.reqAmount - 1) {
+                    synchronized (syncObj) {
+                        try {
+                            syncObj.wait(60_000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            });
+            responseThread.start();
+            responseThreads.add(responseThread);
+        }
+
+        for (int i = 0; i < responseThreads.size(); i++) {
+            Thread responseThread = responseThreads.get(i);
+            try {
+                responseThread.join(60_000);
+                LOGGER.info("FileSize: " + fileSize + "KB; Progress: " + (i + 1) * 100 / responseThreads.size() + "%");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private TestResult setUpTestResult(int fileSize, boolean success, long time) {
+        TestResult testResult = new TestResult();
+        testResult.rtt = tunnelInterface.rtt;
+        testResult.fileSize = fileSize;
+        testResult.requests = configuration.reqAmount;
+        testResult.lossParams = tunnelInterface.lossParams;
+        testResult.bandwidth = tunnelInterface.bandwidth;
+        testResult.speedRate = tunnelInterface.speedRate;
+        testResult.congestionControlWindow = tunnelInterface.getCongestionControlWindowCapacity();
+
+        testResult.success = success;
+        testResult.resultTime = time / clientProcesses.size();
+        testResult.packetLoss.fromClients = tunnelInterface.statistic.clients.getPacketLoss();
+        testResult.packetLoss.fromServers = tunnelInterface.statistic.servers.getPacketLoss();
+        return testResult;
+    }
+
+    @Override
+    public void clear() throws TestErrorException {
         super.clear();
 
-        for (ServerSide serverSide : testContext.serverSides) {
+        for (UT2ServerSide UT2ServerSide : serverSides) {
             try {
-                serverSide.clear();
-            } catch (InterruptedException e) {
+                UT2ServerSide.clear();
+            } catch (InterruptedException ignored) {
                 //ignore :)
             }
         }
@@ -106,48 +196,63 @@ public abstract class AbstractUT2TestStand extends AbstractTestStand {
         ClusterUtils.hosts.clear();
     }
 
-    protected boolean finishClientProcess(int id, long millis) {
-        sendCommand(id, ClientInterface.exit());
-        return waitForClientProcess(id, millis);
-    }
+    @Override
+    protected void createFile(String path, int size, String serverAddress) throws TestErrorException {
+        byte[] fileData = new byte[size * 1024];
+        rnd.nextBytes(fileData);
+        filesData.put(size * 1024, fileData);
 
-    boolean waitForClientProcess(int id, long millis) {
-        boolean finished = false;
         try {
-            finished = clientProcesses.get(id).process.waitFor(millis, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        return finished && clientProcesses.get(id).process.exitValue() == 0;
-    }
-
-    final void sendCommand(int id, String command) {
-        try {
-            clientProcesses.get(id).stdIn.write(command);
-            clientProcesses.get(id).stdIn.flush();
+            Files.createFile(Paths.get(path));
+            FileOutputStream fileOutputStream = new FileOutputStream(new File(path));
+            fileOutputStream.write(fileData);
+            fileOutputStream.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            throw new TestErrorException("Error while generating files: " + e);
         }
     }
 
-    protected final void sendCommands(int id, String... commands) {
-        try {
-            for (String command : commands) {
-                clientProcesses.get(id).stdIn.write(command);
-            }
-            clientProcesses.get(id).stdIn.flush();
-        } catch (IOException e) {
-            e.printStackTrace();
+    private void initClientProcess(Configuration.Device clientDevice, Configuration.Device... serverDevices) throws TestErrorException {
+        final AbstractUT2Client clientProcess = new UT2ClientImpl(clientProcesses.size(), logDir, ut2Mode, clientDevice, serverDevices);
+        clientProcess.start();
+        clientProcesses.add(clientProcess);
+    }
+
+    private String getClientsErrors() throws TestErrorException {
+        StringBuilder result = new StringBuilder();
+        for (AbstractUT2Client clientProcess : clientProcesses) {
+            String clientProcessError = clientProcess.getError();
+            if (!clientProcessError.isEmpty())
+                result.append(clientProcessError).append("\n");
+        }
+        return result.toString();
+    }
+
+    public class UT2ServerHandler implements UT2Pipe2Handler {
+        volatile int lastRequestId;
+        volatile boolean wrongRequestedFileSize;
+
+        @Override
+        public UT2PipeInput createPipe(String s, UT2PeerCtx ut2PeerCtx, UT2PipeOutput ut2PipeOutput) {
+            return new UT2PipeInput() {
+                @Override
+                public void onChunk(byte[] bytes) {
+                    ByteBuffer buffer = ByteBuffer.wrap(bytes);
+                    //todo don't change bytes order in client
+//                    buffer.order(ByteOrder.LITTLE_ENDIAN);
+                    int responseSize = buffer.getInt();
+                    wrongRequestedFileSize = filesData.containsKey(responseSize);
+                    lastRequestId = buffer.getInt();
+                    synchronized (syncObj) {
+                        syncObj.notifyAll();
+                    }
+                    ut2PipeOutput.writeChunk(filesData.get(responseSize));
+                }
+
+                @Override
+                public void onClose() {
+                }
+            };
         }
     }
-
-    final void writeClientConfiguration(Configuration.Device client, Configuration.Device... servers) throws IOException {
-        Configuration.writeClientConfiguration(ut2Mode, testContext.clientConfigFile, client, servers);
-    }
-
-    private static class ClientProcess {
-        private Process process;
-        private OutputStreamWriter stdIn;
-    }
-
 }
